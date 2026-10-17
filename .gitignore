@@ -1,0 +1,10 @@
+# Secrets et données : ne jamais publier
+.env
+database/*.sqlite*
+uploads/*
+!uploads/.htaccess
+!uploads/index.html
+!uploads/.gitkeep
+.DS_Store
+Thumbs.db
+ 

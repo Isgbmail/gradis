@@ -1,0 +1,43 @@
+/* Administration Gradis — même identité que le site (bleu nuit / doré) */
+body.adm { background: #f3f1ec; font-size: .94rem; }
+.adm-shell { display: flex; min-height: 100vh; }
+.adm-side { width: 250px; background: var(--navy); color: #fff; flex-shrink: 0; display: flex; flex-direction: column; }
+@media (min-width: 992px) { .adm-side { position: sticky; top: 0; height: 100vh; visibility: visible !important; transform: none !important; } }
+.adm-side.offcanvas-lg { --bs-offcanvas-bg: var(--navy); --bs-offcanvas-color: #fff; --bs-offcanvas-width: 260px; }
+.adm-brand { display: flex; align-items: center; gap: .5rem; padding: 1rem .9rem; border-bottom: 1px solid rgba(255,255,255,.08); font-family: var(--font-serif); font-size: .95rem; }
+.adm-nav { display: flex; flex-direction: column; padding: .8rem; gap: .15rem; flex: 1; }
+.adm-nav a, .adm-side__foot a { color: rgba(255,255,255,.78); padding: .6rem .8rem; border-radius: 8px; display: flex; gap: .65rem; align-items: center; text-decoration: none; }
+.adm-nav a:hover, .adm-side__foot a:hover { background: rgba(255,255,255,.07); color: #fff; }
+.adm-nav a.active { background: rgba(212,175,55,.16); color: var(--gold-l); box-shadow: inset 3px 0 0 var(--gold); }
+.adm-side__foot { padding: .8rem; border-top: 1px solid rgba(255,255,255,.08); display: flex; flex-direction: column; }
+.adm-main { flex: 1; min-width: 0; }
+.adm-top { background: var(--navy); color: #fff; padding: .6rem 1rem; display: flex; align-items: center; gap: .8rem; position: sticky; top: 0; z-index: 20; }
+.adm-content { padding: 1.5rem; max-width: 1280px; }
+@media (max-width: 575.98px) { .adm-content { padding: 1rem .75rem; } }
+.adm-h1 { font-size: 2rem; margin-bottom: 1.2rem; }
+.adm-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 1.2rem; box-shadow: var(--shadow); }
+.adm-card h2 { font-size: 1.25rem; margin-bottom: .8rem; }
+.adm-stat { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.1rem; height: 100%; }
+.adm-stat small { color: var(--muted); display: block; text-transform: uppercase; letter-spacing: .06em; font-size: .7rem; }
+.adm-stat strong { font-family: var(--font-serif); font-size: 2rem; color: var(--navy); line-height: 1.1; }
+.adm-stat--gold { background: var(--navy); } .adm-stat--gold small { color: rgba(255,255,255,.6); } .adm-stat--gold strong { color: var(--gold-l); }
+.adm-table { --bs-table-bg: transparent; margin: 0; vertical-align: middle; }
+.adm-table th { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.adm-thumb { width: 54px; height: 66px; border-radius: 8px; border: 1px solid var(--line); background: #f6f3ec; overflow: hidden; display: flex; flex-shrink: 0; }
+.adm-thumb img, .adm-thumb svg { width: 100%; height: 100%; object-fit: cover; }
+.adm-prev { width: 120px; aspect-ratio: 4/5; border: 1px solid var(--line); border-radius: 10px; background: radial-gradient(circle at 50% 35%, #fff, #ece7dc); display: flex; padding: 4px; }
+.adm-prev svg { width: 100%; height: 100%; }
+.adm-swatch { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0,0,0,.2); display: inline-block; vertical-align: middle; }
+.adm-login { background: var(--navy); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.adm-login__box { background: #fff; border-radius: 14px; padding: 2rem; width: 100%; max-width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+.adm-login__logo { display: block; width: 190px; margin: 0 auto 1.2rem; border-radius: 6px; }
+.adm-timeline { list-style: none; padding: 0; margin: 0; }
+.adm-timeline li { padding: .4rem 0 .4rem 1rem; border-left: 2px solid var(--gold); margin-left: .3rem; font-size: .85rem; }
+.form-label { font-weight: 500; font-size: .85rem; }
+.adm-chartbox { position: relative; height: 280px; }
+
+/* Corrections : fond du menu sur grand écran, aperçu non étiré, chiffres alignés */
+@media (min-width: 992px) { .adm-side.offcanvas-lg { background-color: var(--navy) !important; color: #fff; } }
+.adm-prev { align-self: flex-start; flex-shrink: 0; }
+.adm-stat strong, .adm-h1, .adm-card h2 { font-variant-numeric: lining-nums; }
+.adm-brand span { color: #fff; }
