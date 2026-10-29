@@ -1,0 +1,16 @@
+# Déploiement Render (Blueprint). Le disque persistant demande une offre payante (Starter).
+services:
+  - type: web
+    name: gradis
+    runtime: docker
+    plan: starter
+    healthCheckPath: /index.php
+    disk:
+      name: gradis-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DB_PATH
+        value: /data/db
+      - key: APP_ENV
+        value: production

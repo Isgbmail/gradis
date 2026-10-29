@@ -31,25 +31,40 @@ const FIELDS = [
     ],
 ];
 
+const NUM_RANGE = ['shipping_fee' => [0, 10000], 'free_shipping_from' => [0, 1000000], 'max_qty' => [1, 99],
+    'text_max_scarf' => [1, 200], 'text_max_cap' => [1, 200], 'text_size_min' => [6, 60], 'text_size_max' => [6, 80],
+    'text_price_scarf' => [0, 10000], 'text_price_cap' => [0, 10000]];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (post('action') === 'hide_demo') {
         setting_set('demo_notice', '0'); flash('Mention « exemple » masquée.'); redirect(url('admin/index.php'));
     }
     try {
         $errs = [];
+        // Bornes logiques des champs numériques (rien n'est enregistré si une valeur est incohérente)
+        $bad = [];
+        foreach (['company_name' => "Nom de l'entreprise", 'hero_title' => 'Titre principal', 'label_trim' => 'Nom commercial des « billets »'] as $rk => $rl)
+            if (mb_strlen(trim((string)($_POST[$rk] ?? ''))) < 2) $bad[] = "$rl : ce champ est obligatoire.";
+        foreach (NUM_RANGE as $k => [$lo, $hi]) {
+            $raw = str_replace(',', '.', trim((string)($_POST[$k] ?? '')));
+            $lab = '';
+            foreach (FIELDS as $fl) if (isset($fl[$k])) $lab = $fl[$k][0];
+            if ($raw === '' || !is_numeric($raw) || (float)$raw < $lo || (float)$raw > $hi) $bad[] = "$lab : valeur entre $lo et $hi attendue.";
+        }
+        if (!$bad && (int)$_POST['text_size_min'] > (int)$_POST['text_size_max']) $bad[] = 'La taille min. du texte dépasse la taille max.';
+        if ($bad) { foreach ($bad as $b) flash($b, 'danger'); redirect(url('admin/settings.php')); }
         foreach (FIELDS as $fields) foreach ($fields as $k => [$label, $type, $max]) {
-            $v = mb_substr(post($k), 0, $max + ($type === 'number' ? 0 : 0));
-            if ($type === 'number') { $v = (string)max(0, (float)str_replace(',', '.', $v)); }
+            $v = mb_substr(post($k), 0, $type === 'number' ? 12 : $max);
+            if ($type === 'number') { $v = (string)round(max(0, (float)str_replace(',', '.', $v)), 2); }
             if ($type === 'email' && $v !== '' && !filter_var($v, FILTER_VALIDATE_EMAIL)) { $errs[] = 'E-mail de contact invalide.'; continue; }
             if ($type === 'url' && $v !== '' && !preg_match('#^https?://#i', $v)) { $errs[] = "$label : l'adresse doit commencer par http(s)://"; continue; }
             if ($k === 'whatsapp_number') { $v = preg_replace('/\D+/', '', $v); if ($v !== '' && (strlen($v) < 10 || strlen($v) > 15)) { $errs[] = 'Numéro WhatsApp invalide (10 à 15 chiffres, indicatif pays inclus).'; continue; } }
             setting_set($k, $v);
         }
-        if ((int)setting('text_size_min') > (int)setting('text_size_max')) $errs[] = 'La taille min. du texte dépasse la taille max.';
-        foreach (['pay_cod', 'pay_whatsapp', 'pay_online'] as $k) setting_set($k, isset($_POST[$k]) ? '1' : '0');
+        foreach (['delivery_enabled', 'pay_cod', 'pay_whatsapp', 'pay_online'] as $k) setting_set($k, isset($_POST[$k]) ? '1' : '0');
         setting_set('demo_notice', isset($_POST['demo_notice']) ? '1' : '0');
         // Images
-        foreach (['hero_image' => 'hero', 'logo_path' => 'brand'] as $k => $sub) {
+        foreach (['logo_path' => 'brand'] as $k => $sub) {
             if (isset($_POST['remove_' . $k])) { delete_upload(setting($k)); setting_set($k, ''); }
             $path = save_image($_FILES[$k] ?? ['error' => UPLOAD_ERR_NO_FILE], $sub);
             if ($path) { delete_upload(setting($k)); setting_set($k, $path); }
@@ -69,10 +84,13 @@ admin_head('Réglages du site', 'settings'); ?>
     <?php foreach ($fields as $k => [$label, $type, $max]): $wide = in_array($type, ['textarea'], true) || in_array($k, ['contact_address', 'about_text', 'hero_text', 'whatsapp_number'], true); ?>
         <div class="<?= $wide ? 'col-12' : 'col-md-6' ?>"><label class="form-label" for="s_<?= e($k) ?>"><?= e($label) ?></label>
         <?php if ($type === 'textarea'): ?><textarea class="form-control" id="s_<?= e($k) ?>" name="<?= e($k) ?>" rows="2" maxlength="<?= $max ?>"><?= e(setting($k)) ?></textarea>
-        <?php else: ?><input class="form-control" id="s_<?= e($k) ?>" name="<?= e($k) ?>" type="<?= $type === 'number' ? 'number" step="0.01" min="0' : e($type) ?>" value="<?= e(setting($k)) ?>"><?php endif; ?></div>
+        <?php else: ?><input class="form-control" id="s_<?= e($k) ?>" name="<?= e($k) ?>" type="<?= $type === 'number' ? 'number" step="' . (isset(NUM_RANGE[$k]) && NUM_RANGE[$k][1] <= 200 && $k !== 'text_price_scarf' ? '1' : '0.01') . '" min="' . (NUM_RANGE[$k][0] ?? 0) . '" max="' . (NUM_RANGE[$k][1] ?? 1000000) : e($type) ?>" value="<?= e(setting($k)) ?>"><?php endif; ?></div>
     <?php endforeach; ?>
     </div>
     <?php if ($title === 'Livraison & paiement'): ?>
+    <hr><div class="fw-semibold mb-2">Disponibilité de la livraison</div>
+    <div class="form-check"><input class="form-check-input" type="checkbox" id="delivery_enabled" name="delivery_enabled" <?= delivery_enabled() ? 'checked' : '' ?>><label class="form-check-label" for="delivery_enabled">Proposer la livraison aux clients</label></div>
+    <div class="form-text">Si cette option est désactivée, les clients devront convenir des modalités de livraison avec vous sur WhatsApp.</div>
     <hr><div class="fw-semibold mb-2">Modes de commande proposés aux clients</div>
     <div class="form-check"><input class="form-check-input" type="checkbox" id="pay_cod" name="pay_cod" <?= setting('pay_cod') === '1' ? 'checked' : '' ?>><label class="form-check-label" for="pay_cod">Paiement à la livraison</label></div>
     <div class="form-check"><input class="form-check-input" type="checkbox" id="pay_whatsapp" name="pay_whatsapp" <?= setting('pay_whatsapp') === '1' ? 'checked' : '' ?>><label class="form-check-label" for="pay_whatsapp">Confirmation par WhatsApp</label></div>
@@ -80,9 +98,9 @@ admin_head('Réglages du site', 'settings'); ?>
     <?php endif; ?>
 </div>
 <?php endforeach; ?>
-<div class="adm-card"><h2>Images</h2>
+<div class="adm-card"><h2>Logo</h2><p class="small text-muted">Les images du bandeau d'accueil se gèrent dans <a href="<?= e(url('admin/hero.php')) ?>">Bandeau d'accueil</a>.</p>
     <div class="row g-3">
-        <?php foreach (['hero_image' => ["Image du bandeau d'accueil (photo de diplômé conseillée, format portrait)", 'hero'], 'logo_path' => ['Logo (en-tête du site)', 'brand']] as $k => [$label]): ?>
+        <?php foreach (['logo_path' => ['Logo (en-tête du site)', 'brand']] as $k => [$label]): ?>
         <div class="col-md-6"><label class="form-label" for="i_<?= $k ?>"><?= e($label) ?></label>
             <?php if (setting($k)): ?><div class="mb-2"><img src="<?= e(url('uploads/' . setting($k))) ?>" alt="" style="max-height:110px;border-radius:8px;border:1px solid var(--line);background:var(--navy)"><label class="d-block small mt-1"><input type="checkbox" class="form-check-input" name="remove_<?= $k ?>"> Retirer (revenir à l'illustration / au logo par défaut)</label></div><?php endif; ?>
             <input class="form-control" type="file" id="i_<?= $k ?>" name="<?= $k ?>" accept="image/jpeg,image/png,image/webp"></div>

@@ -1,0 +1,6 @@
+.git
+.env
+database/*.sqlite*
+uploads/*
+!uploads/.htaccess
+!uploads/index.html

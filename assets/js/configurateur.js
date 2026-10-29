@@ -144,7 +144,7 @@
     // Accessoires incompatibles
     state.accessories = state.accessories.filter(id => {
       const a = C.accessories.find(x => x.id === id);
-      const ok = a && (!a.tiers.length || a.tiers.includes(t)) && a.stock > 0;
+      const ok = a && (!a.tiers.length || a.tiers.includes(t));
       if (!ok && a) changed.push(`« ${a.name} » n'est pas compatible avec la gamme ${C.tiers[t].name}`);
       return ok;
     });
@@ -195,10 +195,10 @@
       const a = C.accessories.find(x => x.id == l.dataset.acc);
       const inp = $('input', l), msg = $('.gr-accmsg', l);
       const compat = !a.tiers.length || a.tiers.includes(state.tier);
-      const ok = compat && a.stock > 0;
+      const ok = compat;
       inp.disabled = !ok; inp.checked = state.accessories.includes(a.id) && ok;
       l.classList.toggle('is-disabled', !ok);
-      msg.textContent = !compat ? `Non compatible avec la gamme ${t.name}.` : (a.stock <= 0 ? 'Momentanément épuisé.' : '');
+      msg.textContent = !compat ? `Non compatible avec la gamme ${t.name}.` : '';
     });
     // Personnalisation texte
     ['scarf', 'cap'].forEach(z => {

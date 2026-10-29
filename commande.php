@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__ . '/includes/layout.php';
 
 $methods = payment_methods();
+$deliveryEnabled = delivery_enabled();
 $cities = ['Casablanca', 'Rabat', 'Marrakech', 'Fès', 'Tanger', 'Agadir', 'Meknès', 'Oujda', 'Kénitra', 'Tétouan', 'Salé', 'Témara', 'Mohammedia', 'El Jadida', 'Safi', 'Nador', 'Béni Mellal', 'Settat', 'Khouribga', 'Taza', 'Essaouira', 'Ouarzazate', 'Errachidia', 'Larache', 'Al Hoceïma', 'Berkane', 'Khémisset', 'Laâyoune', 'Dakhla', 'Guelmim'];
 
 page_head(t('checkout.title'), ['active' => '', 'desc' => 'Finalisez votre commande Gradis.']);
@@ -20,11 +21,16 @@ page_head(t('checkout.title'), ['active' => '', 'desc' => 'Finalisez votre comma
         <div id="coEmpty" class="gr-empty" hidden><i class="bi bi-bag"></i><h2 class="h3">Votre panier est vide</h2>
             <a class="btn btn-gr mt-2" href="<?= e(url('catalogue.php')) ?>">Voir le catalogue</a></div>
 
-        <?php if (!$methods): ?>
+        <?php if (!$deliveryEnabled): ?>
+            <div class="alert alert-info">La livraison n'est pas proposée en ligne pour le moment. Contactez-nous sur
+                <a href="<?= e(wa_link(wa_greeting() . "\nJe souhaite commander et convenir des modalités de livraison.")) ?>" target="_blank" rel="noopener">WhatsApp</a>
+                pour passer commande.</div>
+        <?php elseif (!$methods): ?>
             <div class="alert alert-warning">Aucun mode de commande n'est activé pour le moment. Contactez-nous sur
                 <a href="<?= e(wa_link(wa_greeting())) ?>" target="_blank" rel="noopener">WhatsApp</a>.</div>
         <?php endif; ?>
 
+        <?php if ($deliveryEnabled): ?>
         <form id="coForm" class="row g-4" novalidate hidden>
             <div class="col-lg-7">
                 <div class="gr-panel mb-4">
@@ -67,6 +73,7 @@ page_head(t('checkout.title'), ['active' => '', 'desc' => 'Finalisez votre comma
                 </div>
             </div>
         </form>
+        <?php endif; ?>
     </div>
 </section>
-<?php page_foot(['scripts' => ['assets/js/commande.js']]);
+<?php page_foot(['scripts' => $deliveryEnabled ? ['assets/js/commande.js'] : []]);

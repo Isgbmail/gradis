@@ -29,6 +29,7 @@ function db(): PDO
         require_once __DIR__ . '/schema.php';
         gradis_install($pdo, $driver);
     }
+    db_migrate($pdo, $driver);
     return $pdo;
 }
 
@@ -84,4 +85,18 @@ function update(string $table, int $id, array $data): void
 {
     $set = implode(',', array_map(fn($c) => "$c = ?", array_keys($data)));
     ex("UPDATE $table SET $set WHERE id = ?", [...array_values($data), $id]);
+}
+
+
+/** Migrations légères pour les bases créées avec une version antérieure. */
+function db_migrate(PDO $pdo, string $driver): void
+{
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    if (!db_table_exists($pdo, 'hero_slides')) {
+        $pk = $driver === 'mysql' ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT';
+        $tail = $driver === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
+        $pdo->exec("CREATE TABLE hero_slides (id $pk, path VARCHAR(255) NOT NULL, caption VARCHAR(120), sort INT NOT NULL DEFAULT 0, active INT NOT NULL DEFAULT 1)$tail");
+    }
 }

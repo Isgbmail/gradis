@@ -11,15 +11,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($act === 'status') {
         $new = post('status'); $note = mb_substr(post('note'), 0, 500);
         if (!isset(ORDER_STATUSES[$new])) flash('Statut invalide.', 'danger');
-        elseif ($o['status'] === 'cancelled' && $new !== 'cancelled') flash('Une commande annulée (stock déjà remis en vente) ne peut pas être réactivée. Créez une nouvelle commande.', 'danger');
+        elseif ($new !== $o['status'] && !in_array($new, ORDER_TRANSITIONS[$o['status']] ?? [], true)) flash('Changement de statut impossible : « ' . ORDER_STATUSES[$o['status']] . ' » → « ' . ORDER_STATUSES[$new] . ' ». Une commande annulée ou livrée est définitive ; une commande ne revient pas en arrière.', 'danger');
         elseif ($new !== $o['status'] || $note !== '') {
             $pdo = db(); $pdo->beginTransaction();
             try {
-                if ($new === 'cancelled' && $o['status'] !== 'cancelled') restock_order($id);
                 ex('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', [$new, now(), $id]);
                 insert('order_status_history', ['order_id' => $id, 'status' => $new, 'note' => $note ?: null, 'admin_id' => $admin['id'], 'created_at' => now()]);
                 $pdo->commit();
-                flash('Statut mis à jour : ' . ORDER_STATUSES[$new] . ($new === 'cancelled' ? ' (stock remis en vente).' : '.'));
+                flash('Statut mis à jour : ' . ORDER_STATUSES[$new] . '.');
             } catch (Throwable $e) { $pdo->rollBack(); error_log($e->getMessage()); flash('Erreur lors de la mise à jour.', 'danger'); }
         }
     } elseif ($act === 'note') {
@@ -27,7 +26,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('Note interne enregistrée.');
     } elseif ($act === 'payment') {
         $ps = post('payment_status');
-        if (isset(PAYMENT_STATUSES[$ps])) { ex('UPDATE orders SET payment_status = ?, updated_at = ? WHERE id = ?', [$ps, now(), $id]); flash('Statut de paiement mis à jour (saisie manuelle).'); }
+        if (!isset(PAYMENT_STATUSES[$ps])) flash('Statut de paiement invalide.', 'danger');
+        elseif ($ps === 'refunded' && $o['payment_status'] !== 'paid') flash('Seule une commande payée peut être marquée comme remboursée.', 'danger');
+        elseif ($ps === 'paid' && $o['status'] === 'cancelled') flash('Une commande annulée ne peut pas être marquée comme payée.', 'danger');
+        elseif ($ps === 'paid' && $o['status'] === 'pending') flash('Confirmez d\'abord la commande avant de la marquer comme payée.', 'danger');
+        else { ex('UPDATE orders SET payment_status = ?, updated_at = ? WHERE id = ?', [$ps, now(), $id]); flash('Statut de paiement mis à jour (saisie manuelle).'); }
     }
     redirect(url('admin/order.php?id=' . $id));
 }
@@ -84,10 +87,9 @@ admin_head('Commande ' . $o['number'], 'orders'); ?>
     </div>
     <div class="adm-card"><h2>Statut</h2>
         <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="status">
-            <select class="form-select mb-2" name="status" aria-label="Statut"><?php foreach (ORDER_STATUSES as $k => $v): ?><option value="<?= $k ?>" <?= $o['status'] === $k ? 'selected' : '' ?>><?= e($v) ?></option><?php endforeach; ?></select>
+            <select class="form-select mb-2" name="status" aria-label="Statut"><?php foreach (ORDER_STATUSES as $k => $v): if ($k !== $o['status'] && !in_array($k, ORDER_TRANSITIONS[$o['status']] ?? [], true)) continue; ?><option value="<?= $k ?>" <?= $o['status'] === $k ? 'selected' : '' ?>><?= e($v) ?></option><?php endforeach; ?></select>
             <input class="form-control mb-2" name="note" maxlength="500" placeholder="Commentaire (facultatif)">
             <button class="btn btn-gr w-100">Mettre à jour</button>
-            <div class="form-text">Annuler une commande remet les articles en stock.</div>
         </form>
     </div>
     <div class="adm-card"><h2>Paiement</h2>

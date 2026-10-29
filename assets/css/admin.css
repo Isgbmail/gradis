@@ -41,3 +41,16 @@ body.adm { background: #f3f1ec; font-size: .94rem; }
 .adm-prev { align-self: flex-start; flex-shrink: 0; }
 .adm-stat strong, .adm-h1, .adm-card h2 { font-variant-numeric: lining-nums; }
 .adm-brand span { color: #fff; }
+.adm-logout { color: rgba(255,255,255,.78); padding: .6rem .8rem; border: 0; border-radius: 8px; background: transparent; display: flex; gap: .65rem; align-items: center; width: 100%; text-align: left; }
+.adm-logout:hover { background: rgba(255,255,255,.07); color: #fff; }
+.adm-content { padding: clamp(1rem, 2.2vw, 1.8rem); }
+.adm-card { border-radius: 15px; box-shadow: 0 5px 20px rgba(11,19,43,.055); }
+.adm-card h2 { padding-bottom: .45rem; border-bottom: 1px solid rgba(11,19,43,.07); }
+.adm-table tbody tr { transition: background-color .15s; }
+.adm-table tbody tr:hover { --bs-table-bg: rgba(212,175,55,.07); }
+.adm-login__box { border: 1px solid rgba(212,175,55,.2); }
+.adm-nav a, .adm-side__foot a, .adm-logout { transition: background-color .18s, color .18s; }
+@media (max-width: 575.98px) {
+  .adm-card { padding: 1rem; }
+  .adm-h1 { font-size: 1.7rem; }
+}

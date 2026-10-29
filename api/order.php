@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_out(['ok' => false, 'error' => '
 $in = json_decode((string)file_get_contents('php://input'), true);
 if (!is_array($in)) json_out(['ok' => false, 'error' => 'Requête invalide.'], 400);
 if (!csrf_check($in['csrf'] ?? null)) json_out(['ok' => false, 'error' => 'Session expirée. Rechargez la page et réessayez.'], 419);
+if (!delivery_enabled()) json_out(['ok' => false, 'error' => 'La livraison en ligne n’est pas disponible. Contactez-nous sur WhatsApp pour convenir des modalités.'], 409);
 
 // Limitation : 8 commandes / heure / IP.
 $bucket = 'order:' . client_ip();
@@ -30,12 +31,12 @@ $f = [
     'address' => clean_text((string)($c['address'] ?? ''), 400),
 ];
 $err = [];
-if (mb_strlen($f['last_name']) < 2) $err['last_name'] = 'Indiquez votre nom.';
-if (mb_strlen($f['first_name']) < 2) $err['first_name'] = 'Indiquez votre prénom.';
+if (mb_strlen($f['last_name']) < 2 || !preg_match('/\p{L}{2}/u', $f['last_name'])) $err['last_name'] = 'Indiquez votre nom (lettres uniquement).';
+if (mb_strlen($f['first_name']) < 2 || !preg_match('/\p{L}{2}/u', $f['first_name'])) $err['first_name'] = 'Indiquez votre prénom (lettres uniquement).';
 if (!filter_var($f['email'], FILTER_VALIDATE_EMAIL) || mb_strlen($f['email']) > 190) $err['email'] = 'Adresse e-mail invalide.';
 $digits = preg_replace('/\D+/', '', $f['phone']);
 if (!preg_match('/^(\+|00)?[0-9 .\-()]{8,20}$/', $f['phone']) || strlen($digits) < 9 || strlen($digits) > 15) $err['phone'] = 'Numéro de téléphone invalide (ex. 06 12 34 56 78).';
-if (mb_strlen($f['city']) < 2) $err['city'] = 'Indiquez votre ville.';
+if (mb_strlen($f['city']) < 2 || !preg_match('/\p{L}{2}/u', $f['city'])) $err['city'] = 'Indiquez votre ville.';
 if (mb_strlen($f['address']) < 8) $err['address'] = 'Indiquez votre adresse complète de livraison.';
 
 $methods = payment_methods();
@@ -47,6 +48,7 @@ if ($err) json_out(['ok' => false, 'error' => 'Veuillez corriger le formulaire.'
 $items = is_array($in['items'] ?? null) ? $in['items'] : [];
 if (!$items) json_out(['ok' => false, 'error' => 'Votre panier est vide.'], 422);
 $cart = price_cart($items);
+if (!$cart['errors'] && $cart['total'] <= 0) json_out(['ok' => false, 'error' => 'Montant de commande invalide.'], 422);
 if ($cart['errors'] || !$cart['lines']) {
     json_out(['ok' => false, 'error' => $cart['errors'][0]['message'] ?? 'Panier invalide.', 'cart_errors' => $cart['errors']], 422);
 }
@@ -55,27 +57,6 @@ if ($cart['errors'] || !$cart['lines']) {
 $pdo = db();
 try {
     $pdo->beginTransaction();
-
-    // Revérification du stock dans la transaction + décrément
-    foreach ($cart['lines'] as $l) {
-        if ($l['product_id']) {
-            $size = $l['size'] ?: '*';
-            if ($l['size']) {
-                $n = ex('UPDATE product_variants SET stock = stock - ? WHERE product_id = ? AND size = ? AND stock >= ?', [$l['qty'], $l['product_id'], $size, $l['qty']]);
-            } else {
-                // Pièces sans taille : on prélève sur la première variante qui a du stock.
-                $v = q1('SELECT id FROM product_variants WHERE product_id = ? AND stock >= ? ORDER BY id LIMIT 1', [$l['product_id'], $l['qty']]);
-                $n = $v ? ex('UPDATE product_variants SET stock = stock - ? WHERE id = ?', [$l['qty'], $v['id']]) : 0;
-            }
-            if (!$n) throw new PricingError("Stock insuffisant pour « {$l['title']} ».");
-        } else {
-            foreach ($l['config']['accessories'] ?? [] as $aid) {
-                $v = q1('SELECT id FROM product_variants WHERE product_id = ? AND stock >= ? ORDER BY id LIMIT 1', [$aid, $l['qty']]);
-                if (!$v) throw new PricingError('Stock insuffisant pour un accessoire.');
-                ex('UPDATE product_variants SET stock = stock - ? WHERE id = ?', [$l['qty'], $v['id']]);
-            }
-        }
-    }
 
     $now = now();
     $custId = insert('customers', $f + ['created_at' => $now]);

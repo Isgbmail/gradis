@@ -14,21 +14,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $act = post('action');
     if ($act === 'tier') {
         $code = post('code');
+        try {
         if (isset($tiers[$code]) && post('name') !== '') {
+            $pr = post_money('price_robe', 'Prix de la toge'); $ps = post_money('price_scarf', "Prix de l'écharpe"); $pc = post_money('price_cap', 'Prix de la toque');
             ex('UPDATE tiers SET name=?, description=?, materials=?, price_robe=?, price_scarf=?, price_cap=?, text_scarf=?, text_cap=?, active=? WHERE code=?',
                 [mb_substr(post('name'), 0, 80), mb_substr(post('description'), 0, 500), mb_substr(post('materials'), 0, 500),
-                 max(0, post_num('price_robe')), max(0, post_num('price_scarf')), max(0, post_num('price_cap')),
+                 $pr, $ps, $pc,
                  isset($_POST['text_scarf']) ? 1 : 0, isset($_POST['text_cap']) ? 1 : 0, isset($_POST['active']) ? 1 : 0, $code]);
             flash('Gamme « ' . post('name') . ' » enregistrée.');
         } else flash('Gamme invalide.', 'danger');
+        } catch (RuntimeException $e) { flash($e->getMessage(), 'danger'); }
     } elseif ($act === 'opt_save' || $act === 'opt_add') {
         $grp = post('grp');
         $label = mb_substr(post('label'), 0, 120);
         $hex = post('hex');
         if (!isset(OPT_GROUPS[$grp]) || $label === '') { flash('Libellé obligatoire.', 'danger'); redirect(url('admin/options.php#g-' . $grp)); }
         if ($hex !== '' && !preg_match('/^#[0-9A-Fa-f]{6}$/', $hex)) { flash('Couleur invalide.', 'danger'); redirect(url('admin/options.php#g-' . $grp)); }
+        try { $extra = post_money('price_extra', 'Supplément'); } catch (RuntimeException $e) { flash($e->getMessage(), 'danger'); redirect(url('admin/options.php#g-' . $grp)); }
+        if ($grp === 'size' && mb_strlen($label) > 10) { flash('Une taille ne dépasse pas 10 caractères (ex. XL).', 'danger'); redirect(url('admin/options.php#g-' . $grp)); }
         $tl = array_values(array_intersect((array)($_POST['tiers'] ?? []), array_keys($tiers)));
-        $d = ['label' => $label, 'hex' => $hex ?: null, 'price_extra' => post_num('price_extra'), 'tiers' => implode(',', $tl), 'sort' => post_int('sort'), 'active' => isset($_POST['active']) ? 1 : 0];
+        $d = ['label' => $label, 'hex' => $hex ?: null, 'price_extra' => $extra, 'tiers' => implode(',', $tl), 'sort' => post_clamp('sort', 0, 9999), 'active' => isset($_POST['active']) ? 1 : 0];
         if ($grp === 'font') $d['font_css'] = mb_substr(post('font_css'), 0, 200) ?: null;
         if ($act === 'opt_save') { update('options', post_int('id'), $d); flash('Option enregistrée.'); }
         else {
@@ -82,9 +87,9 @@ admin_head('Gammes & options', 'options'); ?>
     <tr><td><form method="post" id="<?= $fid ?>"><?= csrf_field() ?><input type="hidden" name="action" value="opt_save"><input type="hidden" name="id" value="<?= $o['id'] ?>"><input type="hidden" name="grp" value="<?= e($g) ?>"></form><input form="<?= $fid ?>" class="form-control form-control-sm" name="label" value="<?= e($o['label']) ?>" required aria-label="Libellé"></td>
         <?php if ($g !== 'size' && $g !== 'cap_style' && $g !== 'font'): ?><td><input form="<?= $fid ?>" type="color" class="form-control form-control-color" name="hex" value="<?= e($o['hex'] ?: '#000000') ?>" aria-label="Couleur"></td><?php endif; ?>
         <?php if ($g === 'font'): ?><td><input form="<?= $fid ?>" class="form-control form-control-sm" name="font_css" value="<?= e($o['font_css']) ?>" aria-label="Police"></td><?php endif; ?>
-        <td style="width:100px"><input form="<?= $fid ?>" class="form-control form-control-sm" type="number" step="0.01" name="price_extra" value="<?= e($o['price_extra']) ?>" aria-label="Supplément"></td>
+        <td style="width:100px"><input form="<?= $fid ?>" class="form-control form-control-sm" type="number" step="0.01" min="0" max="100000" name="price_extra" value="<?= e($o['price_extra']) ?>" aria-label="Supplément"></td>
         <td class="text-nowrap"><?php foreach ($tiers as $c => $t): ?><label class="me-2 small"><input form="<?= $fid ?>" type="checkbox" class="form-check-input" name="tiers[]" value="<?= e($c) ?>" <?= in_array($c, $tl, true) ? 'checked' : '' ?>> <?= e(mb_substr($t['name'], 0, 4)) ?>.</label><?php endforeach; ?></td>
-        <td style="width:80px"><input form="<?= $fid ?>" class="form-control form-control-sm" type="number" name="sort" value="<?= (int)$o['sort'] ?>" aria-label="Ordre"></td>
+        <td style="width:80px"><input form="<?= $fid ?>" class="form-control form-control-sm" type="number" min="0" max="9999" name="sort" value="<?= (int)$o['sort'] ?>" aria-label="Ordre"></td>
         <td><input form="<?= $fid ?>" type="checkbox" class="form-check-input" name="active" <?= $o['active'] ? 'checked' : '' ?> aria-label="Actif"></td>
         <td class="text-end text-nowrap"><button form="<?= $fid ?>" class="btn btn-sm btn-outline-dark">Enregistrer</button>
             <form method="post" class="d-inline" data-confirm="Supprimer « <?= e($o['label']) ?> » ?"><?= csrf_field() ?><input type="hidden" name="action" value="opt_del"><input type="hidden" name="id" value="<?= $o['id'] ?>"><button class="btn btn-sm btn-outline-danger" aria-label="Supprimer"><i class="bi bi-trash"></i></button></form></td></tr>
@@ -92,8 +97,8 @@ admin_head('Gammes & options', 'options'); ?>
     <tr class="table-light"><td><form method="post" id="add_<?= e($g) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="opt_add"><input type="hidden" name="grp" value="<?= e($g) ?>"><input type="hidden" name="active" value="1"><input type="hidden" name="tiers[]" value="economie"><input type="hidden" name="tiers[]" value="premium"><input type="hidden" name="tiers[]" value="prestige"></form><input form="add_<?= e($g) ?>" class="form-control form-control-sm" name="label" placeholder="Nouveau…" required aria-label="Nouveau libellé"></td>
         <?php if ($g !== 'size' && $g !== 'cap_style' && $g !== 'font'): ?><td><input form="add_<?= e($g) ?>" type="color" class="form-control form-control-color" name="hex" value="#888888" aria-label="Couleur"></td><?php endif; ?>
         <?php if ($g === 'font'): ?><td><input form="add_<?= e($g) ?>" class="form-control form-control-sm" name="font_css" placeholder="'Cinzel', serif"></td><?php endif; ?>
-        <td><input form="add_<?= e($g) ?>" class="form-control form-control-sm" type="number" step="0.01" name="price_extra" value="0" aria-label="Supplément"></td>
-        <td class="small text-muted">toutes</td><td><input form="add_<?= e($g) ?>" class="form-control form-control-sm" type="number" name="sort" value="99" aria-label="Ordre"></td><td></td>
+        <td><input form="add_<?= e($g) ?>" class="form-control form-control-sm" type="number" step="0.01" min="0" max="100000" name="price_extra" value="0" aria-label="Supplément"></td>
+        <td class="small text-muted">toutes</td><td><input form="add_<?= e($g) ?>" class="form-control form-control-sm" type="number" min="0" max="9999" name="sort" value="99" aria-label="Ordre"></td><td></td>
         <td class="text-end"><button form="add_<?= e($g) ?>" class="btn btn-sm btn-gr">Ajouter</button></td></tr>
     </tbody></table></div>
     <?php if ($g === 'font'): ?><div class="form-text">Les polices utilisables sont celles déjà chargées par le site (Cormorant Garamond, Montserrat, Cinzel, Great Vibes) ou des polices système.</div><?php endif; ?>

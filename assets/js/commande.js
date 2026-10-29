@@ -35,6 +35,7 @@
     if (!items.length) { $('#coEmpty').hidden = false; return; }
     let res;
     try { res = await Cart.price(items); } catch (e) { $('#coEmpty').hidden = false; $('#coEmpty').querySelector('h2').textContent = 'Erreur de chargement. Rechargez la page.'; return; }
+    if (!res.delivery_enabled) { location.href = url('panier.php'); return; }
     if (res.errors.length || !res.lines.length) { location.href = url('panier.php'); return; }
     form.hidden = false;
     $('#coLines').innerHTML = res.lines.map(l => `<div class="d-flex gap-3 py-2 border-bottom"><div class="gr-line__img" style="width:56px">${l.image ? `<img src="${esc(url('uploads/' + l.image))}" alt="" style="width:100%;height:100%;object-fit:cover">` : GradisOutfit.svg(l.render)}</div>

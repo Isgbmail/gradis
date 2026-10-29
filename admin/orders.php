@@ -11,6 +11,10 @@ $where = ['1=1']; $p = [];
 if ($f['q'] !== '') { $where[] = '(number LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR phone LIKE ? OR email LIKE ?)'; $l = '%' . $f['q'] . '%'; array_push($p, $l, $l, $l, $l, $l); }
 if (isset(ORDER_STATUSES[$f['status']])) { $where[] = 'status = ?'; $p[] = $f['status']; }
 if ($f['city'] !== '') { $where[] = 'city LIKE ?'; $p[] = '%' . $f['city'] . '%'; }
+$validDate = fn(string $d) => preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $d, $m) && checkdate((int)$m[2], (int)$m[3], (int)$m[1]);
+if (!$validDate($f['from'])) $f['from'] = '';
+if (!$validDate($f['to'])) $f['to'] = '';
+if ($f['from'] !== '' && $f['to'] !== '' && $f['from'] > $f['to']) [$f['from'], $f['to']] = [$f['to'], $f['from']]; // dates inversées : on les remet dans l'ordre
 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $f['from'])) { $where[] = 'substr(created_at,1,10) >= ?'; $p[] = $f['from']; }
 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $f['to'])) { $where[] = 'substr(created_at,1,10) <= ?'; $p[] = $f['to']; }
 $W = implode(' AND ', $where);
@@ -38,8 +42,8 @@ admin_head('Commandes', 'orders'); ?>
         <div class="col-md-3"><label class="form-label" for="q">Recherche</label><input class="form-control" id="q" name="q" value="<?= e($f['q']) ?>" placeholder="N°, nom, téléphone, e-mail"></div>
         <div class="col-6 col-md-2"><label class="form-label" for="st">Statut</label><select class="form-select" id="st" name="status"><option value="">Tous</option><?php foreach (ORDER_STATUSES as $k => $v): ?><option value="<?= $k ?>" <?= $f['status'] === $k ? 'selected' : '' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
         <div class="col-6 col-md-2"><label class="form-label" for="ci">Ville</label><input class="form-control" id="ci" name="city" value="<?= e($f['city']) ?>"></div>
-        <div class="col-6 col-md-2"><label class="form-label" for="fr">Du</label><input class="form-control" type="date" id="fr" name="from" value="<?= e($f['from']) ?>"></div>
-        <div class="col-6 col-md-2"><label class="form-label" for="to">Au</label><input class="form-control" type="date" id="to" name="to" value="<?= e($f['to']) ?>"></div>
+        <div class="col-6 col-md-2"><label class="form-label" for="fr">Du</label><input class="form-control" type="date" id="fr" name="from" max="<?= date('Y-m-d') ?>" value="<?= e($f['from']) ?>"></div>
+        <div class="col-6 col-md-2"><label class="form-label" for="to">Au</label><input class="form-control" type="date" id="to" name="to" max="<?= date('Y-m-d') ?>" value="<?= e($f['to']) ?>"></div>
         <div class="col-md-1 d-grid"><button class="btn btn-gr">OK</button></div>
     </div>
 </form>

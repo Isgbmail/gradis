@@ -118,7 +118,7 @@ $trim = $data['label_trim'];
                             <label class="gr-chip"><input type="radio" name="zone_scarf" value="right"><span>Bande droite</span></label>
                         </div>
                         <label class="gr-label" for="txt_scarf">Votre texte <span class="text-muted text-lowercase fw-normal" id="cnt_scarf"></span></label>
-                        <input class="form-control" id="txt_scarf" type="text" autocomplete="off" placeholder="Ex. : Prénom NOM · Promotion 2026" data-text="scarf">
+                        <input class="form-control" id="txt_scarf" type="text" autocomplete="off" placeholder="Ex. : Prénom NOM · Promotion <?= date('Y') ?>" data-text="scarf">
                         <div class="d-flex flex-wrap gap-1 mt-2" data-suggest="scarf"></div>
                         <div class="row g-3 mt-1">
                             <div class="col-12"><span class="gr-label">Police</span><div class="gr-chips" data-fonts="scarf" role="radiogroup" aria-label="Police de l'écharpe"></div></div>
@@ -142,7 +142,7 @@ $trim = $data['label_trim'];
                         <span class="gr-label">Zone</span>
                         <div class="gr-chips mb-3"><span class="gr-chip"><span style="min-width:0">Dessus de la toque</span></span></div>
                         <label class="gr-label" for="txt_cap">Votre texte <span class="text-muted text-lowercase fw-normal" id="cnt_cap"></span></label>
-                        <input class="form-control" id="txt_cap" type="text" autocomplete="off" placeholder="Ex. : Promotion 2026" data-text="cap">
+                        <input class="form-control" id="txt_cap" type="text" autocomplete="off" placeholder="Ex. : Promotion <?= date('Y') ?>" data-text="cap">
                         <div class="d-flex flex-wrap gap-1 mt-2" data-suggest="cap"></div>
                         <div class="row g-3 mt-1">
                             <div class="col-12"><span class="gr-label">Police</span><div class="gr-chips" data-fonts="cap" role="radiogroup" aria-label="Police de la toque"></div></div>
@@ -168,5 +168,5 @@ $trim = $data['label_trim'];
     <button type="button" class="btn btn-gr" id="addBtnM"><i class="bi bi-bag-plus"></i> <span>Ajouter</span></button>
 </div>
 
-<script>window.GR_CONF = <?= json_encode($data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>; window.GR_PRESET = <?= json_encode($preset, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;</script>
+<script nonce="<?= e(csp_nonce()) ?>">window.GR_CONF = <?= json_for_script($data) ?>; window.GR_PRESET = <?= json_for_script($preset) ?>;</script>
 <?php page_foot(['scripts' => ['assets/js/configurateur.js']]);

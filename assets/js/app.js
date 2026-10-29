@@ -1,5 +1,5 @@
 /**
- * Gradis — JS commun : panier (localStorage), favoris, recherche, ajout rapide, WhatsApp, toasts.
+ * Gradis — JS commun : panier (localStorage), recherche, ajout rapide, WhatsApp, toasts.
  * Le panier ne stocke que des CHOIX ; les prix sont toujours recalculés par le serveur (api/price.php).
  */
 (function () {
@@ -16,7 +16,7 @@
   const url = p => (G.base || '') + '/' + String(p).replace(/^\//, '');
 
   // ----------------------------------------------------------- stockage ---
-  const KEY = 'gradis.cart.v1', FAV = 'gradis.fav.v1';
+  const KEY = 'gradis.cart.v1';
   const safe = {
     get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* mode privé */ } },
@@ -92,31 +92,6 @@
   $$('[data-search-close]').forEach(b => b.addEventListener('click', () => { searchForm.hidden = true; }));
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && searchForm && !searchForm.hidden) searchForm.hidden = true; });
 
-  // -------------------------------------------------------------- favoris ---
-  const Fav = {
-    all() { return safe.get(FAV, []); },
-    has(id) { return Fav.all().includes(+id); },
-    toggle(id) { id = +id; const a = Fav.all(); const i = a.indexOf(id); i >= 0 ? a.splice(i, 1) : a.push(id); safe.set(FAV, a); return i < 0; },
-  };
-  window.GradisFav = Fav;
-  function paintFavs() {
-    $$('[data-fav]').forEach(b => {
-      const on = Fav.has(b.dataset.fav);
-      b.classList.toggle('is-fav', on);
-      b.setAttribute('aria-pressed', on ? 'true' : 'false');
-      const i = $('i', b); if (i) i.className = 'bi bi-heart' + (on ? '-fill' : '');
-    });
-  }
-  document.addEventListener('click', e => {
-    const b = e.target.closest('[data-fav]');
-    if (!b) return;
-    e.preventDefault();
-    const on = Fav.toggle(b.dataset.fav);
-    paintFavs();
-    toast(on ? 'Ajouté à vos favoris' : 'Retiré de vos favoris');
-    document.dispatchEvent(new CustomEvent('gradis:favs'));
-  });
-
   // --------------------------------------------------------- ajout rapide ---
   const PRODUCTS = {};
   window.GRADIS_PRODUCTS = PRODUCTS;
@@ -135,7 +110,7 @@
       $('[data-qa-price]', el).textContent = money(p.price);
       const th = $('[data-qa-thumb]', el);
       th.className = 'gr-qa-thumb gr-line__img';
-      th.innerHTML = GradisOutfit.svg(p.render);
+      th.innerHTML = p.image ? `<img src="${url('uploads/' + p.image)}" alt="" style="width:100%;height:100%;object-fit:cover">` : GradisOutfit.svg(p.render);
       $('[data-qa-error]', el).hidden = true;
       $('[data-qa-qty] input', el).value = 1;
       const cw = $('[data-qa-colors-wrap]', el), sw = $('[data-qa-sizes-wrap]', el);
@@ -144,7 +119,7 @@
       chipRadios($('[data-qa-colors]', el), 'qa-color', p.colors, (c, i) =>
         `<label class="gr-chip gr-chip--color"><input type="radio" name="qa-color" value="${esc(c.code)}" ${i === 0 ? 'checked' : ''}><span><i class="gr-dot" style="--c:${esc(c.hex)}"></i>${esc(c.label)}</span></label>`);
       chipRadios($('[data-qa-sizes]', el), 'qa-size', p.sizes, s =>
-        `<label class="gr-chip"><input type="radio" name="qa-size" value="${esc(s.size)}" ${s.stock <= 0 ? 'disabled' : ''}><span>${esc(s.size)}</span></label>`);
+        `<label class="gr-chip"><input type="radio" name="qa-size" value="${esc(s.size)}"><span>${esc(s.size)}</span></label>`);
       qa.modal.show();
     },
     confirm() {
@@ -193,5 +168,4 @@
   if (pj) { try { JSON.parse(pj.textContent).forEach(p => { PRODUCTS[p.id] = p; }); } catch (e) { /* ignore */ } }
 
   Cart.refresh();
-  paintFavs();
 })();

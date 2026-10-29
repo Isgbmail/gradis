@@ -25,7 +25,6 @@ for ($i = 29; $i >= 0; $i--) {
 }
 $topCities = q("SELECT city, COUNT(*) n FROM orders WHERE status <> 'cancelled' GROUP BY city ORDER BY n DESC LIMIT 5");
 $topItems = q("SELECT i.title, SUM(i.qty) q FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.status <> 'cancelled' GROUP BY i.title ORDER BY q DESC LIMIT 5");
-$lowStock = q("SELECT p.id, p.name, COALESCE(SUM(v.stock),0) s FROM products p LEFT JOIN product_variants v ON v.product_id = p.id WHERE p.active = 1 GROUP BY p.id HAVING s <= 5 ORDER BY s LIMIT 6");
 
 admin_head('Tableau de bord', 'dash');
 ?>
@@ -63,10 +62,8 @@ admin_head('Tableau de bord', 'dash');
             <?php if (!$topItems): ?><p class="text-muted mb-0">Pas encore de données.</p><?php else: ?><ol class="mb-0 ps-3"><?php foreach ($topItems as $t): ?><li><?= e($t['title']) ?> <span class="text-muted">× <?= (int)$t['q'] ?></span></li><?php endforeach; ?></ol><?php endif; ?></div>
         <div class="adm-card"><h2>Villes principales</h2>
             <?php if (!$topCities): ?><p class="text-muted mb-0">Pas encore de données.</p><?php else: ?><ul class="mb-0 ps-3"><?php foreach ($topCities as $t): ?><li><?= e($t['city']) ?> <span class="text-muted">— <?= (int)$t['n'] ?></span></li><?php endforeach; ?></ul><?php endif; ?></div>
-        <div class="adm-card"><h2>Stock faible</h2>
-            <?php if (!$lowStock): ?><p class="text-muted mb-0">Aucun produit en stock faible.</p><?php else: ?><ul class="mb-0 ps-3"><?php foreach ($lowStock as $t): ?><li><a href="<?= e(url('admin/product.php?id=' . $t['id'])) ?>"><?= e($t['name']) ?></a> <span class="badge text-bg-<?= (int)$t['s'] === 0 ? 'danger' : 'warning' ?>"><?= (int)$t['s'] ?></span></li><?php endforeach; ?></ul><?php endif; ?></div>
     </div>
 </div>
-<script>window.ADM = <?= json_encode(['labels' => $labels, 'orders' => $orders30, 'rev' => $rev30,
-    'status' => ['labels' => array_values(ORDER_STATUSES), 'data' => array_values($counts)]], JSON_UNESCAPED_UNICODE) ?>;</script>
+<script nonce="<?= e(csp_nonce()) ?>">window.ADM = <?= json_for_script(['labels' => $labels, 'orders' => $orders30, 'rev' => $rev30,
+    'status' => ['labels' => array_values(ORDER_STATUSES), 'data' => array_values($counts)]]) ?>;</script>
 <?php admin_foot(['assets/vendor/chart/chart.umd.js', 'assets/js/admin-dashboard.js']);

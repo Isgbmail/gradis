@@ -93,12 +93,6 @@ page_head('Nos tenues', ['active' => 'shop', 'desc' => 'Catalogue Gradis : tenue
                                 <span>–</span>
                                 <input type="number" id="fMax" class="form-control" min="0" placeholder="<?= $pmax ?>" aria-label="Prix maximum" inputmode="numeric">
                             </div>
-                            <div class="form-check form-switch mt-4">
-                                <input class="form-check-input" type="checkbox" role="switch" id="fStock"><label class="form-check-label" for="fStock">En stock uniquement</label>
-                            </div>
-                            <div class="form-check form-switch mt-2">
-                                <input class="form-check-input" type="checkbox" role="switch" id="fFav"><label class="form-check-label" for="fFav">Mes favoris <i class="bi bi-heart-fill text-danger"></i></label>
-                            </div>
                             <button type="button" class="btn btn-gr-outline w-100 mt-4" id="fReset">Réinitialiser</button>
                         </div>
                     </div>
@@ -126,5 +120,5 @@ page_head('Nos tenues', ['active' => 'shop', 'desc' => 'Catalogue Gradis : tenue
     </div>
 </section>
 
-<script type="application/json" id="gr-products"><?= json_encode(array_map('product_public', $products), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
+<script nonce="<?= e(csp_nonce()) ?>" type="application/json" id="gr-products"><?= json_for_script(array_map('product_public', $products)) ?></script>
 <?php page_foot(['scripts' => ['assets/js/catalogue.js']]);

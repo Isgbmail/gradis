@@ -42,7 +42,7 @@ function gradis_install(PDO $pdo, string $driver): void
 
         "CREATE TABLE product_images (id $pk, product_id $ref NOT NULL, path VARCHAR(255) NOT NULL, sort INT NOT NULL DEFAULT 0)$tail",
         "CREATE TABLE product_variants (id $pk, product_id $ref NOT NULL, size VARCHAR(10) NOT NULL,
-            stock INT NOT NULL DEFAULT 0, UNIQUE (product_id, size))$tail",
+            UNIQUE (product_id, size))$tail",
 
         "CREATE TABLE customers (id $pk, first_name VARCHAR(100) NOT NULL, last_name VARCHAR(100) NOT NULL,
             email VARCHAR(190) NOT NULL, phone VARCHAR(40) NOT NULL, city VARCHAR(100) NOT NULL,
@@ -71,6 +71,8 @@ function gradis_install(PDO $pdo, string $driver): void
 
         "CREATE TABLE reviews (id $pk, author VARCHAR(120) NOT NULL, city VARCHAR(100), rating INT NOT NULL DEFAULT 5,
             body TEXT NOT NULL, active INT NOT NULL DEFAULT 1, is_demo INT NOT NULL DEFAULT 0, created_at VARCHAR(19) NOT NULL)$tail",
+
+        "CREATE TABLE hero_slides (id $pk, path VARCHAR(255) NOT NULL, caption VARCHAR(120), sort INT NOT NULL DEFAULT 0, active INT NOT NULL DEFAULT 1)$tail",
 
         "CREATE TABLE faqs (id $pk, question VARCHAR(255) NOT NULL, answer TEXT NOT NULL, sort INT NOT NULL DEFAULT 0,
             active INT NOT NULL DEFAULT 1)$tail",
@@ -102,6 +104,7 @@ function gradis_seed(PDO $pdo, bool $demo): void
         'about_text' => "Gradis habille les diplômés marocains avec des tenues de graduation et de soutenance soignées : toges, écharpes et toques, à composer entièrement selon vos envies.",
         'shipping_fee' => '40',
         'free_shipping_from' => '800',
+        'delivery_enabled' => '1',
         'pay_cod' => '1', 'pay_whatsapp' => '1', 'pay_online' => '0',
         'max_qty' => '20',
         'text_max_scarf' => '28', 'text_max_cap' => '18',
@@ -243,7 +246,7 @@ function gradis_seed(PDO $pdo, bool $demo): void
             null, null, null, null, null, 'economie,premium,prestige'],
     ];
     $sp = $pdo->prepare('INSERT INTO products (category_id,tier,name,slug,description,price,active,colors,def_robe,def_scarf,def_trim,def_cap,tiers_allowed,sort,created_at) VALUES (?,?,?,?,?,?,1,?,?,?,?,?,?,?,?)');
-    $sv = $pdo->prepare('INSERT INTO product_variants (product_id,size,stock) VALUES (?,?,?)');
+    $sv = $pdo->prepare('INSERT INTO product_variants (product_id,size) VALUES (?,?)');
     $i = 0;
     foreach ($products as $p) {
         $i++;
@@ -251,9 +254,7 @@ function gradis_seed(PDO $pdo, bool $demo): void
         $sp->execute([$cid($p[0]), $p[1], $p[2], $slug, $p[4], $p[3], $p[5], $p[6], $p[7], $p[8], $p[9], $p[10], $i, $now]);
         $pid = (int)$pdo->lastInsertId();
         if (in_array($p[0], ['tenues-completes', 'toge-seule'], true)) {
-            foreach ($sizes as $s) $sv->execute([$pid, $s, ($s === 'XXL' ? 3 : 12)]);
-        } else {
-            $sv->execute([$pid, '*', 40]);
+            foreach ($sizes as $s) $sv->execute([$pid, $s]);
         }
     }
 

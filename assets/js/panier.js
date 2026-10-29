@@ -12,17 +12,17 @@
 
   function lineHtml(l, err) {
     const isCustom = l.kind === 'custom';
-    const edit = isCustom ? `<a class="small" href="${esc(url('configurateur.php?edit=' + l.id))}"><i class="bi bi-pencil"></i> Modifier la personnalisation</a>`
-      : (l.slug ? `<a class="small" href="${esc(url('produit.php?slug=' + l.slug))}">Voir le produit</a>` : '');
+    const edit = isCustom ? `<a class="gr-line__action" href="${esc(url('configurateur.php?edit=' + l.id))}"><i class="bi bi-pencil"></i> Modifier la personnalisation</a>`
+      : (l.slug ? `<a class="gr-line__action" href="${esc(url('produit.php?slug=' + l.slug))}"><i class="bi bi-eye"></i> Voir le produit</a>` : '');
     return `<div class="gr-line" data-line="${esc(l.id)}">
       <div class="gr-line__img">${thumb(l)}</div>
       <div>
         <div class="gr-line__title">${esc(l.title)}</div>
         <ul class="gr-line__details">${l.details.map(d => `<li>${esc(d)}</li>`).join('')}</ul>
-        <div class="d-flex flex-wrap align-items-center gap-3">
+        <div class="gr-line__actions">
           <div class="gr-qty"><button type="button" data-act="dec" aria-label="Diminuer la quantité">−</button><input type="number" min="1" max="${window.GRADIS.maxQty}" value="${l.qty}" aria-label="Quantité" data-act="qty"><button type="button" data-act="inc" aria-label="Augmenter la quantité">+</button></div>
           ${edit}
-          <button type="button" class="btn btn-link text-danger p-0 small" data-act="rm"><i class="bi bi-trash"></i> Supprimer</button>
+          <button type="button" class="gr-line__action gr-line__action--remove" data-act="rm"><i class="bi bi-trash"></i> Supprimer</button>
         </div>
       </div>
       <div class="gr-line__total">${money(l.line_total)}<div class="small fw-normal text-muted">${money(l.unit_price)} / unité</div></div>
@@ -31,7 +31,7 @@
   function errHtml(e) {
     return `<div class="gr-line" data-line="${esc(e.id)}"><div class="gr-line__img"><i class="bi bi-exclamation-triangle m-auto text-warning fs-3"></i></div>
       <div><div class="gr-line__title">Article indisponible</div><div class="gr-line__err">${esc(e.message)}</div>
-      <div class="mt-2 d-flex gap-3"><a class="small" href="${esc(url('configurateur.php?edit=' + e.id))}">Modifier</a><button type="button" class="btn btn-link text-danger p-0 small" data-act="rm"><i class="bi bi-trash"></i> Retirer</button></div></div><div></div></div>`;
+      <div class="gr-line__actions"><a class="gr-line__action" href="${esc(url('configurateur.php?edit=' + e.id))}"><i class="bi bi-pencil"></i> Modifier</a><button type="button" class="gr-line__action gr-line__action--remove" data-act="rm"><i class="bi bi-trash"></i> Retirer</button></div></div><div></div></div>`;
   }
 
   async function load() {
@@ -42,7 +42,7 @@
     try { res = await Cart.price(items); } catch (e) {
       $('#cartLoading').hidden = true; $('#cartError').hidden = false;
       $('#cartError').innerHTML = 'Impossible de charger votre panier pour le moment. <button class="btn btn-link p-0 align-baseline" id="retry">Réessayer</button>';
-      $('#retry').onclick = load; return;
+      $('#retry').addEventListener('click', load); return;
     }
     last = res;
     $('#cartLoading').hidden = true;
@@ -51,12 +51,14 @@
     $('#cartLines').innerHTML = items.map(it => byId[it.id] ? lineHtml(byId[it.id]) : (errs[it.id] ? errHtml(errs[it.id]) : '')).join('');
     $('#cartBody').hidden = false;
     $('#sSub').textContent = money(res.subtotal);
-    $('#sShip').textContent = res.shipping > 0 ? money(res.shipping) : (res.subtotal > 0 ? 'Offerte' : '—');
+    $('#sShip').textContent = !res.delivery_enabled ? 'À convenir sur WhatsApp' : (res.shipping > 0 ? money(res.shipping) : (res.subtotal > 0 ? 'Offerte' : '—'));
     $('#sTotal').textContent = money(res.total);
     const rest = res.free_from - res.subtotal;
-    $('#sFree').textContent = res.free_from > 0 && rest > 0 && res.lines.length ? `Plus que ${money(rest)} pour la livraison offerte.` : '';
+    $('#sFree').textContent = res.delivery_enabled && res.free_from > 0 && rest > 0 && res.lines.length ? `Plus que ${money(rest)} pour la livraison offerte.` : '';
+    $('#sDeliveryNote').hidden = res.delivery_enabled;
     const blocked = res.errors.length > 0 || !res.lines.length;
     const go = $('#goCheckout');
+    go.hidden = !res.delivery_enabled;
     go.classList.toggle('disabled', blocked); go.setAttribute('aria-disabled', blocked ? 'true' : 'false');
     $('#waCart').href = waLink(waMessage(res));
   }
@@ -67,7 +69,9 @@
       L.push('', `• ${l.qty} × ${l.title} — ${money(l.line_total)}`);
       l.details.forEach(d => L.push('   ' + d));
     });
-    L.push('', `Sous-total : ${money(res.subtotal)}`, `Livraison : ${res.shipping > 0 ? money(res.shipping) : 'offerte'}`, `Total estimé : ${money(res.total)}`);
+    L.push('', `Sous-total : ${money(res.subtotal)}`);
+    if (res.delivery_enabled) L.push(`Livraison : ${res.shipping > 0 ? money(res.shipping) : 'offerte'}`, `Total estimé : ${money(res.total)}`);
+    else L.push('Livraison : à convenir sur WhatsApp');
     return L.join('\n');
   }
 

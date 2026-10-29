@@ -16,4 +16,5 @@ $lines = array_map(fn($l) => [
     'details' => $l['details'], 'render' => $l['render'], 'slug' => $l['slug'], 'image' => $l['image'] ?? null,
 ], $cart['lines']);
 json_out(['ok' => true, 'lines' => $lines, 'errors' => $cart['errors'], 'subtotal' => $cart['subtotal'],
-    'shipping' => $cart['shipping'], 'total' => $cart['total'], 'free_from' => $cart['free_from'], 'fee' => $cart['fee']]);
+    'shipping' => $cart['shipping'], 'total' => $cart['total'], 'free_from' => $cart['free_from'], 'fee' => $cart['fee'],
+    'delivery_enabled' => $cart['delivery_enabled']]);

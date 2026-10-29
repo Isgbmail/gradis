@@ -16,6 +16,7 @@ function setting(string $key, string $default = ''): string
     $all = settings_all();
     return array_key_exists($key, $all) ? $all[$key] : $default;
 }
+function delivery_enabled(): bool { return setting('delivery_enabled', '1') === '1'; }
 function setting_set(string $key, string $value): void
 {
     if (qv('SELECT COUNT(*) FROM settings WHERE skey = ?', [$key])) {

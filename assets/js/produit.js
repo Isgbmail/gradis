@@ -19,7 +19,7 @@
     if (wrap) GradisOutfit.mount(wrap, r);
   }
   function waMessage() {
-    const lines = [GRADIS.waGreeting, 'Je souhaite commander :', `• ${document.getElementById('qty').value} × ${P.name} (${P.tier_name}) — ${Gradis.money(P.price)}`];
+    const lines = [GRADIS.waGreeting, 'Je souhaite commander :', `• ${Math.max(1, Math.min(GRADIS.maxQty, parseInt(document.getElementById('qty').value, 10) || 1))} × ${P.name} (${P.tier_name}) — ${Gradis.money(P.price)}`];
     const c = P.colors.find(x => x.code === val('color')); if (c) lines.push('   Couleur : ' + c.label);
     if (val('size')) lines.push('   Taille : ' + val('size'));
     lines.push(location.href);

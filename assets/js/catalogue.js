@@ -11,9 +11,8 @@
   function apply() {
     const q = norm($('fSearch').value.trim());
     const cat = radio('cat'), tier = radio('tier'), color = radio('color'), size = radio('size');
-    const min = parseFloat($('fMin').value), max = parseFloat($('fMax').value);
-    const stock = $('fStock').checked, fav = $('fFav').checked;
-    const favs = window.GradisFav ? GradisFav.all() : [];
+    let min = Math.max(0, parseFloat($('fMin').value)), max = Math.max(0, parseFloat($('fMax').value));
+    if (!isNaN(min) && !isNaN(max) && min > max) [min, max] = [max, min]; // bornes inversées : on les remet dans l'ordre
     let n = 0;
     cards.forEach(c => {
       const d = c.dataset, price = parseFloat(d.price);
@@ -21,8 +20,7 @@
         && (!cat || d.cat === cat) && (!tier || d.tier === tier)
         && (!color || d.colors.split(' ').includes(color))
         && (!size || d.sizes.split(' ').includes(size))
-        && (isNaN(min) || price >= min) && (isNaN(max) || price <= max)
-        && (!stock || +d.stock > 0) && (!fav || favs.includes(+d.id));
+        && (isNaN(min) || price >= min) && (isNaN(max) || price <= max);
       c.hidden = !ok;
       if (ok) n++;
     });
@@ -50,11 +48,8 @@
   ['fMin', 'fMax'].forEach(id => $(id).addEventListener('input', apply));
   $('fSort').addEventListener('change', e => sort(e.target.value));
   $('fSortM').addEventListener('change', e => sort(e.target.value));
-  document.addEventListener('gradis:favs', () => { if ($('fFav').checked) apply(); });
-
   function reset() {
     $('fSearch').value = ''; $('fMin').value = ''; $('fMax').value = '';
-    $('fStock').checked = $('fFav').checked = false;
     document.querySelectorAll('#filters input[type=radio][value=""]').forEach(r => { r.checked = true; });
     sort('order'); apply();
   }

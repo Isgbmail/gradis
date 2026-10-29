@@ -15,7 +15,6 @@ $p = $found[0];
 $tier = tiers_all(false)[$p['tier']] ?? null;
 $related = array_slice(array_filter(catalog_products('p.category_id = ? AND p.id <> ?', [$p['category_id'], $p['id']]), fn($x) => true), 0, 4);
 $kind = $p['kind'];
-$inStock = (int)$p['stock'] > 0;
 $tiersAllowed = tier_list_csv($p['tiers_allowed']);
 $allTiers = tiers_all(false);
 
@@ -70,10 +69,10 @@ page_head($p['name'], ['active' => 'shop', 'desc' => mb_substr(strip_tags((strin
                             <span class="gr-label">Taille</span>
                             <div class="gr-chips" role="radiogroup" aria-label="Taille">
                                 <?php foreach ($p['sizes'] as $s): ?>
-                                    <label class="gr-chip"><input type="radio" name="size" value="<?= e($s['size']) ?>" <?= $s['stock'] <= 0 ? 'disabled' : '' ?>><span><?= e($s['size']) ?></span></label>
+                                    <label class="gr-chip"><input type="radio" name="size" value="<?= e($s['size']) ?>"><span><?= e($s['size']) ?></span></label>
                                 <?php endforeach; ?>
                             </div>
-                            <div class="gr-note">Une taille barrée est momentanément épuisée. Un doute ? <a href="<?= e(wa_link(wa_greeting() . "\nJe voudrais un conseil de taille pour : {$p['name']}")) ?>" target="_blank" rel="noopener">Demandez conseil sur WhatsApp</a>.</div>
+                            <div class="gr-note">Un doute sur votre taille ? <a href="<?= e(wa_link(wa_greeting() . "\nJe voudrais un conseil de taille pour : {$p['name']}")) ?>" target="_blank" rel="noopener">Demandez conseil sur WhatsApp</a>.</div>
                         </div>
                     <?php endif; ?>
                     <div class="mb-4">
@@ -81,10 +80,9 @@ page_head($p['name'], ['active' => 'shop', 'desc' => mb_substr(strip_tags((strin
                         <div class="gr-qty"><button type="button" data-q="-1" aria-label="Moins">−</button><input type="number" id="qty" min="1" max="<?= (int)setting('max_qty', '20') ?>" value="1" aria-label="Quantité"><button type="button" data-q="1" aria-label="Plus">+</button></div>
                     </div>
                     <div class="text-danger small mb-2" id="buyError" role="alert" hidden></div>
-                    <?php if (!$inStock): ?><div class="alert alert-warning">Ce produit est momentanément épuisé. Écrivez-nous pour connaître la date de retour en stock.</div><?php endif; ?>
 
                     <div class="d-grid gap-2 d-sm-flex flex-wrap">
-                        <button type="submit" class="btn btn-gr btn-lg flex-grow-1" <?= $inStock ? '' : 'disabled' ?>><i class="bi bi-bag-plus"></i> <?= e(t('btn.add_cart')) ?></button>
+                        <button type="submit" class="btn btn-gr btn-lg flex-grow-1"><i class="bi bi-bag-plus"></i> <?= e(t('btn.add_cart')) ?></button>
                         <?php if ($kind !== 'accessory'): ?>
                             <a class="btn btn-gr-outline btn-lg" href="<?= e(url('configurateur.php?product=' . (int)$p['id'])) ?>"><i class="bi bi-brush"></i> <?= e(t('btn.customize')) ?></a>
                         <?php endif; ?>
@@ -100,7 +98,11 @@ page_head($p['name'], ['active' => 'shop', 'desc' => mb_substr(strip_tags((strin
                         <?= e(implode(', ', array_map(fn($c) => $allTiers[$c]['name'] ?? $c, $tiersAllowed))) ?>.</p>
                 <?php endif; ?>
                 <ul class="list-unstyled small text-muted mt-4 mb-0">
-                    <li><i class="bi bi-truck text-warning"></i> Livraison partout au Maroc — <?= (float)setting('free_shipping_from') > 0 ? 'offerte dès ' . e(money(setting('free_shipping_from'))) : e(money(setting('shipping_fee'))) ?></li>
+                    <?php if (delivery_enabled()): ?>
+                        <li><i class="bi bi-truck text-warning"></i> Livraison partout au Maroc — <?= (float)setting('free_shipping_from') > 0 ? 'offerte dès ' . e(money(setting('free_shipping_from'))) : e(money(setting('shipping_fee'))) ?></li>
+                    <?php else: ?>
+                        <li><i class="bi bi-whatsapp text-warning"></i> Modalités de livraison à convenir sur WhatsApp</li>
+                    <?php endif; ?>
                     <li><i class="bi bi-credit-card text-warning"></i> Paiement à la livraison ou confirmation par WhatsApp</li>
                 </ul>
             </div>
@@ -115,6 +117,6 @@ page_head($p['name'], ['active' => 'shop', 'desc' => mb_substr(strip_tags((strin
     </div>
 </section>
 
-<script type="application/json" id="gr-products"><?= json_encode(array_map('product_public', array_merge([$p], $related)), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
-<script>window.GR_PRODUCT = <?= json_encode(product_public($p), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;</script>
+<script nonce="<?= e(csp_nonce()) ?>" type="application/json" id="gr-products"><?= json_for_script(array_map('product_public', array_merge([$p], $related))) ?></script>
+<script nonce="<?= e(csp_nonce()) ?>">window.GR_PRODUCT = <?= json_for_script(product_public($p)) ?>;</script>
 <?php page_foot(['scripts' => ['assets/js/produit.js']]);

@@ -8,15 +8,45 @@ $tiers = tiers_all();
 $reviews = q('SELECT * FROM reviews WHERE active = 1 ORDER BY id DESC LIMIT 6');
 $faqs = q('SELECT * FROM faqs WHERE active = 1 ORDER BY sort, id');
 $heroImg = setting('hero_image');
-$heroCfg = ['view' => 'outfit', 'robe' => 'noir', 'scarf' => 'beige', 'trim' => 'or', 'cap' => 'noir', 'cap_style' => 'long',
-    'custom' => ['scarf' => ['text' => 'Promotion 2026', 'zone' => 'both', 'font' => 'script', 'color' => 'or', 'align' => 'center', 'size' => 18]]];
 
 page_head('', ['active' => 'home']);
 ?>
-<section class="gr-hero on-dark">
-    <div class="container">
-        <div class="row align-items-center gy-4">
-            <div class="col-lg-6 order-2 order-lg-1">
+<?php
+// Diapositives du bandeau : photos téléversées (Admin → Bandeau d'accueil), sinon illustrations générées.
+$slides = q('SELECT * FROM hero_slides WHERE active = 1 ORDER BY sort, id');
+if (!$slides && $heroImg) $slides = [['path' => $heroImg, 'caption' => '']];
+if (!$slides) {
+    // Photos par défaut (remplacées dès que des images sont téléversées dans Admin → Bandeau d'accueil)
+    $slides = [
+        ['src' => 'assets/img/hero/grad2.webp', 'caption' => 'Votre réussite, à votre image'],
+        ['src' => 'assets/img/hero/grad3.webp', 'caption' => 'Toge noire & détails bordeaux'],
+        ['src' => 'assets/img/hero/grad1.webp', 'caption' => 'Toque, écharpe brodée & fleurs'],
+    ];
+}
+$photo = true;
+foreach ($slides as &$sl) {
+    $sl['src'] = $sl['src'] ?? 'uploads/' . $sl['path'];
+    $dim = @getimagesize(GR_ROOT . '/' . $sl['src']);
+    $sl['portrait'] = $dim && $dim[1] > $dim[0] * 1.05;
+}
+unset($sl);
+$nSlides = count($slides);
+$cats = q("SELECT c.slug, c.name, c.kind, COUNT(p.id) n FROM categories c LEFT JOIN products p ON p.category_id = c.id AND p.active = 1 GROUP BY c.id ORDER BY c.sort, c.id");
+?>
+<section class="gr-hero on-dark<?= $photo ? ' gr-hero--photo' : '' ?>" data-hero aria-roledescription="carrousel" aria-label="Présentation des tenues">
+    <div class="gr-hero__slides" aria-hidden="true">
+        <?php foreach ($slides as $i => $sl): ?>
+            <div class="gr-slide<?= $i === 0 ? ' is-active' : '' ?><?= $sl['portrait'] ? ' gr-slide--portrait' : '' ?>" data-slide>
+                <?php $u = e(url($sl['src'])); $ld = $i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'; ?>
+                <?php if ($sl['portrait']): ?><img class="gr-slide__bg" src="<?= $u ?>" alt="" <?= $ld ?>><?php endif; ?>
+                <img class="<?= $sl['portrait'] ? 'gr-slide__fg' : '' ?>" src="<?= $u ?>" alt="" <?= $ld ?>>
+            </div>
+        <?php endforeach; ?>
+    </div>
+    <div class="gr-hero__shade" aria-hidden="true"></div>
+    <div class="container gr-hero__inner">
+        <div class="row align-items-center gy-4 w-100 m-0">
+            <div class="col-lg-6 order-2 order-lg-1 ps-lg-0">
                 <span class="gr-eyebrow">Tenues de soutenance &amp; graduation</span>
                 <h1><?= e(setting('hero_title')) ?></h1>
                 <p class="lead"><?= e(setting('hero_text')) ?></p>
@@ -28,17 +58,33 @@ page_head('', ['active' => 'home']);
                     <a class="text-warning" href="<?= e(url('configurateur.php')) ?>">ouvrir le configurateur</a></p>
             </div>
             <div class="col-lg-6 order-1 order-lg-2">
-                <div class="gr-hero__fig">
+                <?php if (!$photo): ?>
+                <div class="gr-hero__figs">
                     <span class="gr-hero__ring" aria-hidden="true"></span>
-                    <?php if ($heroImg): ?>
-                        <img src="<?= e(url('uploads/' . $heroImg)) ?>" alt="Tenue de graduation Gradis">
-                    <?php else: ?>
-                        <div class="gr-svgwrap" style="max-width:380px;height:520px" data-outfit='<?= e(json_encode($heroCfg, JSON_UNESCAPED_UNICODE)) ?>' role="img" aria-label="Illustration d'une tenue de graduation"></div>
-                    <?php endif; ?>
+                    <?php foreach ($slides as $i => $sl): ?>
+                        <div class="gr-hero__fig<?= $i === 0 ? ' is-active' : '' ?>" data-fig>
+                            <div class="gr-svgwrap" data-outfit='<?= e(json_encode($sl['cfg'], JSON_UNESCAPED_UNICODE)) ?>' role="img" aria-label="Illustration d'une tenue de graduation — <?= e($sl['caption']) ?>"></div>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
+    <?php if ($nSlides > 1): ?>
+    <script nonce="<?= e(csp_nonce()) ?>">window.GRADIS_HERO_CAPTIONS = <?= json_for_script(array_map(fn($x) => $x['caption'] ?? '', $slides)) ?>;</script>
+    <div class="gr-hero__ctrl container" role="group" aria-label="Commandes du carrousel">
+        <div class="gr-hero__cap" aria-live="polite" data-hero-cap><?= e($slides[0]['caption'] ?? '') ?></div>
+        <div class="gr-hero__btns">
+            <button type="button" class="gr-hbtn" data-hero-prev aria-label="Diapositive précédente"><i class="bi bi-chevron-left"></i></button>
+            <div class="gr-hero__dots">
+                <?php foreach ($slides as $i => $sl): ?><button type="button" class="gr-dot<?= $i === 0 ? ' is-active' : '' ?>" data-hero-dot="<?= $i ?>" aria-label="Diapositive <?= $i + 1 ?> sur <?= $nSlides ?>"<?= $i === 0 ? ' aria-current="true"' : '' ?>></button><?php endforeach; ?>
+            </div>
+            <button type="button" class="gr-hbtn" data-hero-next aria-label="Diapositive suivante"><i class="bi bi-chevron-right"></i></button>
+            <button type="button" class="gr-hbtn" data-hero-pause aria-label="Mettre en pause le défilement"><i class="bi bi-pause-fill"></i></button>
+        </div>
+    </div>
+    <?php endif; ?>
 </section>
 
 <section class="gr-usp on-dark" aria-label="Nos engagements">
@@ -51,6 +97,24 @@ page_head('', ['active' => 'home']);
         </div>
     </div>
 </section>
+
+<?php if ($cats): $catView = ['outfit' => ['view' => 'outfit', 'robe' => 'noir', 'scarf' => 'beige', 'trim' => 'or', 'cap' => 'noir'], 'robe' => ['view' => 'robe', 'robe' => 'bleu-nuit', 'trim' => 'or'],
+    'scarf' => ['view' => 'scarf', 'scarf' => 'bordeaux', 'trim' => 'or'], 'cap' => ['view' => 'cap', 'cap' => 'noir', 'trim' => 'or'], 'accessory' => ['view' => 'accessory', 'icon' => 'tube']]; ?>
+<section class="gr-section gr-section--tight" id="categories" aria-labelledby="catTitle">
+    <div class="container">
+        <div class="gr-title reveal"><h2 id="catTitle">Parcourir par catégorie</h2><p>Une tenue complète, ou uniquement la pièce qu'il vous faut.</p></div>
+        <div class="gr-cats reveal">
+            <?php foreach ($cats as $c): if (!(int)$c['n']) continue; ?>
+                <a class="gr-cat" href="<?= e(url('catalogue.php?cat=' . $c['slug'])) ?>">
+                    <span class="gr-cat__art"><span class="gr-svgwrap" data-outfit='<?= e(json_encode($catView[$c['kind']] ?? $catView['outfit'])) ?>' aria-hidden="true"></span></span>
+                    <span class="gr-cat__name"><?= e($c['name']) ?></span>
+                    <span class="gr-cat__n"><?= (int)$c['n'] ?> modèle<?= (int)$c['n'] > 1 ? 's' : '' ?></span>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</section>
+<?php endif; ?>
 
 <section class="gr-section" id="tenues">
     <div class="container">
@@ -100,7 +164,7 @@ page_head('', ['active' => 'home']);
         <div class="row g-4">
             <div class="col-6 col-lg-3 reveal"><div class="gr-feature"><i class="bi bi-gem"></i><h3>Finitions soignées</h3><p>Coutures renforcées, tissus choisis et détails dorés pour une tenue qui tient toute la journée.</p></div></div>
             <div class="col-6 col-lg-3 reveal"><div class="gr-feature"><i class="bi bi-brush"></i><h3>100 % personnalisable</h3><p>Couleurs, taille, broderie du prénom, de l'année ou de l'établissement.</p></div></div>
-            <div class="col-6 col-lg-3 reveal"><div class="gr-feature"><i class="bi bi-truck"></i><h3>Livraison au Maroc</h3><p>Nous livrons dans toutes les villes. Frais et livraison offerte indiqués au panier.</p></div></div>
+            <div class="col-6 col-lg-3 reveal"><div class="gr-feature"><i class="bi bi-truck"></i><h3>Livraison au Maroc</h3><p><?= delivery_enabled() ? 'Nous livrons dans toutes les villes. Frais et livraison offerte indiqués au panier.' : 'Contactez-nous sur WhatsApp pour convenir des modalités de livraison.' ?></p></div></div>
             <div class="col-6 col-lg-3 reveal"><div class="gr-feature"><i class="bi bi-whatsapp"></i><h3>Un conseiller WhatsApp</h3><p>Une question sur une taille, une couleur ou un délai ? Nous répondons directement.</p></div></div>
         </div>
     </div>
@@ -169,5 +233,5 @@ page_head('', ['active' => 'home']);
     </div>
 </section>
 
-<script type="application/json" id="gr-products"><?= json_encode(array_map('product_public', $featured), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
-<?php page_foot();
+<script nonce="<?= e(csp_nonce()) ?>" type="application/json" id="gr-products"><?= json_for_script(array_map('product_public', $featured)) ?></script>
+<?php page_foot(['scripts' => ['assets/js/hero.js']]);

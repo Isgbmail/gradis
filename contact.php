@@ -51,7 +51,7 @@ $products = catalog_products('', [], 'p.sort, p.id');
         </div>
     </div>
 </section>
-<script>
+<script nonce="<?= e(csp_nonce()) ?>">
 document.getElementById('waForm').addEventListener('submit', function (e) {
   e.preventDefault();
   var v = function (id) { return document.getElementById(id).value.trim(); };

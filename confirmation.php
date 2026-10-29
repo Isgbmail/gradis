@@ -56,5 +56,5 @@ page_head('Commande confirmée', ['active' => '']);
         </div>
     </div>
 </section>
-<script>try { localStorage.removeItem('gradis.cart.v1'); } catch (e) {}</script>
+<script nonce="<?= e(csp_nonce()) ?>">try { localStorage.removeItem('gradis.cart.v1'); } catch (e) {}</script>
 <?php page_foot();

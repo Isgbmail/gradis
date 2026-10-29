@@ -32,6 +32,7 @@ page_head('Panier', ['active' => '', 'desc' => 'Votre panier Gradis.']);
                     <div class="gr-sumrow"><span>Sous-total</span><span id="sSub">—</span></div>
                     <div class="gr-sumrow"><span>Livraison</span><span id="sShip">—</span></div>
                     <div class="small text-muted" id="sFree"></div>
+                    <div class="small text-muted mt-2" id="sDeliveryNote" hidden>La livraison est à convenir avec nous sur WhatsApp.</div>
                     <div class="gr-sumrow gr-sumrow--total align-items-baseline"><span>Total</span><strong id="sTotal">—</strong></div>
                     <div class="d-grid gap-2 mt-3">
                         <a class="btn btn-gr btn-lg" id="goCheckout" href="<?= e(url('commande.php')) ?>"><?= e(t('btn.checkout')) ?></a>

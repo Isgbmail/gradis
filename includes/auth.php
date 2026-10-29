@@ -9,6 +9,11 @@ const ORDER_STATUSES = [
     'pending' => 'En attente', 'confirmed' => 'Confirmée', 'preparing' => 'En préparation',
     'shipped' => 'Expédiée', 'delivered' => 'Livrée', 'cancelled' => 'Annulée',
 ];
+/** Transitions de statut autorisées (une commande ne revient jamais en arrière ; annulée/livrée = définitif). */
+const ORDER_TRANSITIONS = [
+    'pending' => ['confirmed', 'cancelled'], 'confirmed' => ['preparing', 'shipped', 'cancelled'],
+    'preparing' => ['shipped', 'cancelled'], 'shipped' => ['delivered', 'cancelled'], 'delivered' => [], 'cancelled' => [],
+];
 const STATUS_BADGE = [
     'pending' => 'warning', 'confirmed' => 'info', 'preparing' => 'primary',
     'shipped' => 'secondary', 'delivered' => 'success', 'cancelled' => 'danger',
@@ -112,15 +117,51 @@ function save_image(array $file, string $sub = 'products'): ?string
 {
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return null;
     if ($file['error'] !== UPLOAD_ERR_OK) throw new RuntimeException("Échec du téléversement (code {$file['error']}).");
-    if ($file['size'] > 5 * 1024 * 1024) throw new RuntimeException('Image trop lourde (5 Mo maximum).');
-    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+    $tmp = (string)($file['tmp_name'] ?? '');
+    if ($tmp === '' || !is_uploaded_file($tmp)) throw new RuntimeException('Fichier téléversé invalide.');
+    $size = filesize($tmp);
+    if ($size === false || $size > 5 * 1024 * 1024) throw new RuntimeException('Image trop lourde (5 Mo maximum).');
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp);
+    if (!is_string($mime)) throw new RuntimeException('Impossible de vérifier le format de cette image.');
     $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$mime] ?? null;
-    if (!$ext || !@getimagesize($file['tmp_name'])) throw new RuntimeException('Format non accepté (JPG, PNG ou WebP uniquement).');
+    $image = @getimagesize($tmp);
+    if (!$ext || !$image || ($image['mime'] ?? '') !== $mime) throw new RuntimeException('Format non accepté (JPG, PNG ou WebP uniquement).');
+    $width = (int)$image[0];
+    $height = (int)$image[1];
+    if ($width < 1 || $height < 1 || $width > 10000 || $height > 10000 || $width * $height > 16000000) {
+        throw new RuntimeException('Dimensions d’image trop importantes.');
+    }
     $dir = UPLOAD_ROOT . '/' . $sub;
     if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) throw new RuntimeException('Dossier uploads non inscriptible.');
     $name = bin2hex(random_bytes(10)) . '.' . $ext;
     if (!move_uploaded_file($file['tmp_name'], "$dir/$name")) throw new RuntimeException("Impossible d'enregistrer l'image.");
-    return "$sub/$name";
+    return "$sub/" . optimize_image("$dir/$name", $mime);
+}
+/** Réduit les photos lourdes (max 1600 px), supprime les métadonnées (EXIF/GPS) et convertit en WebP si GD le permet. Retourne le nom final. */
+function optimize_image(string $file, string $mime): string
+{
+    if (!function_exists('imagecreatetruecolor')) return basename($file);
+    try {
+        $src = match ($mime) { 'image/jpeg' => @imagecreatefromjpeg($file), 'image/png' => @imagecreatefrompng($file), 'image/webp' => @imagecreatefromwebp($file), default => false };
+        if (!$src) return basename($file);
+        if ($mime === 'image/jpeg' && function_exists('exif_read_data')) {
+            $ex = @exif_read_data($file); $o = (int)($ex['Orientation'] ?? 1);
+            $src = match ($o) { 3 => imagerotate($src, 180, 0), 6 => imagerotate($src, -90, 0), 8 => imagerotate($src, 90, 0), default => $src };
+        }
+        $w = imagesx($src); $h = imagesy($src); $max = 1600;
+        if (max($w, $h) > $max) {
+            $r = $max / max($w, $h);
+            $dst = imagescale($src, (int)round($w * $r), (int)round($h * $r));
+            if ($dst) $src = $dst;
+        }
+        imagealphablending($src, false); imagesavealpha($src, true);
+        if (function_exists('imagewebp')) {
+            $out = preg_replace('/\.[a-z]+$/', '.webp', $file);
+            if (imagewebp($src, $out, 82)) { if ($out !== $file) @unlink($file); return basename($out); }
+        }
+        if ($mime === 'image/jpeg' && imagejpeg($src, $file, 85)) return basename($file);
+    } catch (Throwable $e) { /* on garde l'original */ }
+    return basename($file);
 }
 function delete_upload(?string $rel): void
 {
@@ -134,6 +175,18 @@ function delete_upload(?string $rel): void
 function post(string $k, string $d = ''): string { return trim((string)($_POST[$k] ?? $d)); }
 function post_int(string $k, int $d = 0): int { return (int)($_POST[$k] ?? $d); }
 function post_num(string $k): float { return (float)str_replace(',', '.', (string)($_POST[$k] ?? 0)); }
+/** Montant en DH saisi dans un formulaire : doit être un nombre fini, compris entre $min et $max (sinon RuntimeException). */
+function post_money(string $k, string $label, float $min = 0.0, float $max = 100000.0): float
+{
+    $raw = str_replace([',', ' '], ['.', ''], (string)($_POST[$k] ?? ''));
+    if ($raw === '' || !is_numeric($raw)) throw new RuntimeException("$label : saisissez un montant valide.");
+    $v = round((float)$raw, 2);
+    if (!is_finite($v) || $v < $min) throw new RuntimeException("$label : le montant ne peut pas être négatif" . ($min > 0 ? ' ou nul' : '') . '.');
+    if ($v > $max) throw new RuntimeException("$label : le montant ne peut pas dépasser " . number_format($max, 0, ',', ' ') . ' DH.');
+    return $v;
+}
+/** Entier de formulaire borné (hors bornes : ramené dans l'intervalle). */
+function post_clamp(string $k, int $min, int $max, int $d = 0): int { return max($min, min($max, (int)($_POST[$k] ?? $d))); }
 
 /** Numéro marocain/international → chiffres pour wa.me (06… → 2126…). */
 function wa_phone(string $p): string
@@ -142,21 +195,6 @@ function wa_phone(string $p): string
     if (str_starts_with($d, '00')) $d = substr($d, 2);
     elseif (str_starts_with($d, '0') && strlen($d) === 10) $d = '212' . substr($d, 1);
     return $d;
-}
-
-/** Remet en stock les articles d'une commande annulée. */
-function restock_order(int $orderId): void
-{
-    foreach (q('SELECT * FROM order_items WHERE order_id = ?', [$orderId]) as $it) {
-        $cfg = json_decode((string)$it['config_json'], true) ?: [];
-        if ($it['product_id']) {
-            if ($it['size']) ex('UPDATE product_variants SET stock = stock + ? WHERE product_id = ? AND size = ?', [$it['qty'], $it['product_id'], $it['size']]);
-            else ex('UPDATE product_variants SET stock = stock + ? WHERE id = (SELECT id FROM product_variants WHERE product_id = ? ORDER BY id LIMIT 1)', [$it['qty'], $it['product_id']]);
-        }
-        foreach ($cfg['config']['accessories'] ?? [] as $aid) {
-            ex('UPDATE product_variants SET stock = stock + ? WHERE id = (SELECT id FROM product_variants WHERE product_id = ? ORDER BY id LIMIT 1)', [$it['qty'], (int)$aid]);
-        }
-    }
 }
 
 // ------------------------------------------------------------- layout ----
@@ -168,6 +206,7 @@ function admin_head(string $title, string $active = ''): void
         'orders' => ['receipt', 'Commandes', 'admin/orders.php'],
         'products' => ['bag', 'Produits', 'admin/products.php'],
         'options' => ['palette', 'Gammes & options', 'admin/options.php'],
+        'hero' => ['images', "Bandeau d'accueil", 'admin/hero.php'],
         'content' => ['chat-quote', 'Avis, FAQ, catégories', 'admin/content.php'],
         'settings' => ['gear', 'Réglages du site', 'admin/settings.php'],
         'users' => ['people', 'Administrateurs', 'admin/users.php'],
@@ -183,7 +222,7 @@ function admin_head(string $title, string $active = ''): void
 <link rel="stylesheet" href="<?= e(asset('assets/vendor/icons/bootstrap-icons.min.css')) ?>">
 <link rel="stylesheet" href="<?= e(asset('assets/css/style.css')) ?>">
 <link rel="stylesheet" href="<?= e(asset('assets/css/admin.css')) ?>">
-<script>window.GRADIS_PALETTE = <?= json_encode(palette_data(), JSON_UNESCAPED_UNICODE) ?>;</script>
+<script nonce="<?= e(csp_nonce()) ?>">window.GRADIS_PALETTE = <?= json_for_script(palette_data()) ?>;</script>
 </head><body class="adm">
 <div class="adm-shell">
 <aside class="adm-side offcanvas-lg offcanvas-start" tabindex="-1" id="admSide">
@@ -197,7 +236,7 @@ function admin_head(string $title, string $active = ''): void
     <div class="adm-side__foot">
         <a href="<?= e(url('index.php')) ?>" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Voir le site</a>
         <div class="small text-white-50 mt-2"><?= e($u['name'] ?? '') ?><br><?= e($u['email'] ?? '') ?></div>
-        <a href="<?= e(url('admin/logout.php')) ?>" class="mt-1"><i class="bi bi-box-arrow-left"></i> Déconnexion</a>
+        <form method="post" action="<?= e(url('admin/logout.php')) ?>" class="mt-1"><?= csrf_field() ?><button type="submit" class="adm-logout"><i class="bi bi-box-arrow-left"></i> Déconnexion</button></form>
     </div>
 </aside>
 <div class="adm-main">
@@ -221,7 +260,7 @@ function admin_foot(array $scripts = []): void
 </div>
 <script src="<?= e(asset('assets/vendor/bootstrap/bootstrap.bundle.min.js')) ?>"></script>
 <script src="<?= e(asset('assets/js/outfit.js')) ?>"></script>
-<script>document.addEventListener('DOMContentLoaded',function(){ if(window.GradisOutfit) GradisOutfit.hydrate(); document.querySelectorAll('[data-confirm]').forEach(function(f){ f.addEventListener('submit',function(e){ if(!confirm(f.getAttribute('data-confirm'))) e.preventDefault(); }); }); });</script>
+<script nonce="<?= e(csp_nonce()) ?>">document.addEventListener('DOMContentLoaded',function(){ if(window.GradisOutfit) GradisOutfit.hydrate(); document.addEventListener('submit',function(e){ var msg=e.target.getAttribute('data-confirm'); if(msg && !window.confirm(msg)) e.preventDefault(); }); document.addEventListener('click',function(e){ var el=e.target.closest('[data-confirm]'); if(el && el.tagName !== 'FORM' && !window.confirm(el.getAttribute('data-confirm'))) e.preventDefault(); var image=e.target.closest('[data-image-action]'); if(image){ var input=image.form && image.form.querySelector('[name=img]'); if(input) input.value=image.getAttribute('data-image-action'); } }); document.addEventListener('change',function(e){ if(e.target.matches('[data-submit-on-change]') && e.target.form) e.target.form.requestSubmit(); }); });</script>
 <?php foreach ($scripts as $s): ?><script src="<?= e(asset($s)) ?>"></script>
 <?php endforeach; ?>
 </body></html>

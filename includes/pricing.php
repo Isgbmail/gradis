@@ -37,11 +37,6 @@ function clean_text(string $s, int $max): string
     return mb_substr($s, 0, $max);
 }
 
-function product_stock(int $productId, string $size): int
-{
-    return (int)qv('SELECT stock FROM product_variants WHERE product_id = ? AND size = ?', [$productId, $size]);
-}
-
 /** Tarifie une ligne du panier. Lève PricingError si invalide. */
 function price_item(array $it): array
 {
@@ -67,13 +62,9 @@ function price_product_item(array $it, int $qty): array
     $needsSize = in_array($kind, ['outfit', 'robe'], true);
     if ($needsSize) {
         $size = (string)($it['size'] ?? '');
-        $v = q1('SELECT stock FROM product_variants WHERE product_id = ? AND size = ?', [$p['id'], $size]);
+        $v = q1('SELECT 1 FROM product_variants WHERE product_id = ? AND size = ?', [$p['id'], $size]);
         if (!$v) throw new PricingError("Choisissez une taille pour « {$p['name']} ».");
-        if ((int)$v['stock'] < $qty) throw new PricingError("Stock insuffisant pour « {$p['name']} » en taille $size.");
         $details[] = "Taille : $size";
-    } else {
-        $total = (int)qv("SELECT COALESCE(SUM(stock),0) FROM product_variants WHERE product_id = ?", [$p['id']]);
-        if ($total < $qty) throw new PricingError("Stock insuffisant pour « {$p['name']} ».");
     }
 
     // Couleur choisie parmi celles proposées par le produit.
@@ -90,6 +81,7 @@ function price_product_item(array $it, int $qty): array
 
     $render = product_render_config($p, $color);
     $unit = (float)$p['price'];
+    if ($unit <= 0) throw new PricingError("Le prix de « {$p['name']} » n'est pas disponible. Contactez-nous.");
     return [
         'kind' => $kind, 'product_id' => (int)$p['id'], 'title' => $p['name'],
         'tier' => $tier, 'tier_name' => $tierName, 'size' => $size, 'qty' => $qty,
@@ -202,9 +194,6 @@ function price_custom_item(array $it, int $qty): array
         if ($allowed && !in_array($tier, $allowed, true)) {
             throw new PricingError("« {$a['name']} » n'est pas compatible avec la gamme {$T['name']}.");
         }
-        if ((int)qv('SELECT COALESCE(SUM(stock),0) FROM product_variants WHERE product_id = ?', [$aid]) < $qty) {
-            throw new PricingError("Stock insuffisant pour « {$a['name']} ».");
-        }
         $price += (float)$a['price'];
         $acc[] = (int)$a['id'];
         $details[] = "Accessoire : {$a['name']}";
@@ -260,6 +249,7 @@ function price_custom_item(array $it, int $qty): array
     ];
 
     $unit = round($price, 2);
+    if ($unit <= 0) throw new PricingError('Prix de la composition indisponible. Contactez-nous sur WhatsApp.');
     return [
         'kind' => 'custom', 'product_id' => null, 'title' => $title, 'tier' => $tier, 'tier_name' => $T['name'],
         'size' => $size, 'qty' => $qty, 'unit_price' => $unit, 'line_total' => round($unit * $qty, 2),
@@ -285,13 +275,13 @@ function price_cart(array $items): array
         }
     }
     $shipping = 0.0;
-    $fee = (float)setting('shipping_fee', '0');
-    $free = (float)setting('free_shipping_from', '0');
-    if ($subtotal > 0 && !($free > 0 && $subtotal >= $free)) $shipping = $fee;
+    $fee = max(0.0, (float)setting('shipping_fee', '0'));
+    $free = max(0.0, (float)setting('free_shipping_from', '0'));
+    if (delivery_enabled() && $subtotal > 0 && !($free > 0 && $subtotal >= $free)) $shipping = $fee;
     return [
         'lines' => $lines, 'errors' => $errors,
         'subtotal' => round($subtotal, 2), 'shipping' => round($shipping, 2), 'total' => round($subtotal + $shipping, 2),
-        'free_from' => $free, 'fee' => $fee,
+        'free_from' => $free, 'fee' => $fee, 'delivery_enabled' => delivery_enabled(),
     ];
 }
 
@@ -320,9 +310,8 @@ function configurator_data(): array
     }
     $acc = [];
     foreach (q("SELECT p.* FROM products p JOIN categories c ON c.id = p.category_id WHERE c.kind='accessory' AND p.active = 1 ORDER BY p.sort, p.id") as $a) {
-        $stock = (int)qv('SELECT COALESCE(SUM(stock),0) FROM product_variants WHERE product_id = ?', [$a['id']]);
         $acc[] = ['id' => (int)$a['id'], 'name' => $a['name'], 'price' => (float)$a['price'], 'tiers' => tier_list_csv($a['tiers_allowed']),
-            'icon' => accessory_icon($a['name']), 'stock' => $stock, 'description' => $a['description']];
+            'icon' => accessory_icon($a['name']), 'description' => $a['description']];
     }
     return [
         'tiers' => $tiers, 'options' => $opts, 'accessories' => $acc,

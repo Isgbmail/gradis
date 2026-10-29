@@ -32,7 +32,7 @@ function page_head(string $title, array $opts = []): void
     <link rel="stylesheet" href="<?= e(asset('assets/vendor/bootstrap/bootstrap.min.css')) ?>">
     <link rel="stylesheet" href="<?= e(asset('assets/vendor/icons/bootstrap-icons.min.css')) ?>">
     <link rel="stylesheet" href="<?= e(asset('assets/css/style.css')) ?>">
-    <script>window.GRADIS = <?= json_encode($g) ?>; window.GRADIS_PALETTE = <?= json_encode(palette_data(), JSON_UNESCAPED_UNICODE) ?>;</script>
+    <script nonce="<?= e(csp_nonce()) ?>">window.GRADIS = <?= json_for_script($g) ?>; window.GRADIS_PALETTE = <?= json_for_script(palette_data()) ?>;</script>
 </head>
 <body class="<?= e($opts['body'] ?? '') ?>">
 <a class="visually-hidden-focusable gr-skip" href="#main">Aller au contenu</a>

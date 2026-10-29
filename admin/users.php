@@ -7,13 +7,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $act = post('action');
     if ($act === 'add') {
         $email = strtolower(post('email')); $pw = (string)($_POST['password'] ?? '');
-        if (post('name') === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) flash('Nom et e-mail valides requis.', 'danger');
+        if (mb_strlen(post('name')) < 2 || mb_strlen(post('name')) > 80 || !filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 190) flash('Nom (2 à 80 caractères) et e-mail valides requis.', 'danger');
         elseif (qv('SELECT 1 FROM admin_users WHERE email = ?', [$email])) flash('Cet e-mail existe déjà.', 'danger');
         elseif ($p = password_problem($pw)) flash($p, 'danger');
         else { admin_create(post('name'), $email, $pw); flash('Administrateur ajouté.'); }
     } elseif ($act === 'password') {
         $id = post_int('id'); $pw = (string)($_POST['password'] ?? '');
-        if ($p = password_problem($pw)) flash($p, 'danger');
+        if (!qv('SELECT 1 FROM admin_users WHERE id = ?', [$id])) flash('Compte introuvable.', 'danger');
+        elseif ($p = password_problem($pw)) flash($p, 'danger');
         else { ex('UPDATE admin_users SET password_hash = ? WHERE id = ?', [password_hash($pw, PASSWORD_DEFAULT), $id]); flash('Mot de passe modifié.'); }
     } elseif ($act === 'del') {
         $id = post_int('id');
@@ -31,7 +32,7 @@ admin_head('Administrateurs', 'users'); ?>
 <td class="text-end"><form method="post" class="d-inline-flex gap-1"><?= csrf_field() ?><input type="hidden" name="id" value="<?= $u['id'] ?>">
     <input class="form-control form-control-sm" type="password" name="password" placeholder="Nouveau mot de passe" autocomplete="new-password" style="width:170px" aria-label="Nouveau mot de passe">
     <button class="btn btn-sm btn-outline-dark" name="action" value="password">Changer</button>
-    <?php if ((int)$u['id'] !== (int)$me['id']): ?><button class="btn btn-sm btn-outline-danger" name="action" value="del" onclick="return confirm('Supprimer ce compte ?')" aria-label="Supprimer"><i class="bi bi-trash"></i></button><?php endif; ?></form></td></tr>
+    <?php if ((int)$u['id'] !== (int)$me['id']): ?><button class="btn btn-sm btn-outline-danger" name="action" value="del" data-confirm="Supprimer ce compte ?" aria-label="Supprimer"><i class="bi bi-trash"></i></button><?php endif; ?></form></td></tr>
 <?php endforeach; ?></tbody></table></div></div></div>
 <div class="col-lg-5"><form method="post" class="adm-card"><?= csrf_field() ?><input type="hidden" name="action" value="add"><h2>Ajouter un administrateur</h2>
     <label class="form-label" for="un">Nom</label><input class="form-control mb-2" id="un" name="name" required>
